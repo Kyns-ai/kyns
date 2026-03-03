@@ -100,17 +100,9 @@ module.exports = {
       }
 
       if (req?.body?.isTemporary) {
-        try {
-          const appConfig = req.config;
-          update.expiredAt = createTempChatExpirationDate(appConfig?.interfaceConfig);
-        } catch (err) {
-          logger.error('Error creating temporary chat expiration date:', err);
-          logger.info(`---\`saveConvo\` context: ${metadata?.context}`);
-          update.expiredAt = null;
-        }
-      } else {
-        update.expiredAt = null;
+        return null;
       }
+      update.expiredAt = null;
 
       /** @type {{ $set: Partial<TConversation>; $unset?: Record<keyof TConversation, number> }} */
       const updateOperation = { $set: update };

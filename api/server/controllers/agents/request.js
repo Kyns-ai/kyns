@@ -50,6 +50,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
   } = req.body;
 
   const userId = req.user.id;
+  const isPrivateMode = req.body?.isTemporary === true;
 
   const { allowed, pendingRequests, limit } = await checkAndIncrementPendingRequest(userId);
   if (!allowed) {
@@ -131,9 +132,11 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           partialMessage.agent_id = req.body.agent_id;
         }
 
-        await saveMessage(req, partialMessage, {
-          context: 'api/server/controllers/agents/request.js - partial response on disconnect',
-        });
+        if (!isPrivateMode) {
+          await saveMessage(req, partialMessage, {
+            context: 'api/server/controllers/agents/request.js - partial response on disconnect',
+          });
+        }
 
         logger.debug(
           `[ResumableAgentController] Saved partial response for ${streamId}, content parts: ${aggregatedContent.length}`,
@@ -271,7 +274,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
         // Save user message BEFORE sending final event to avoid race condition
         // where client refetch happens before database is updated
-        if (!client.skipSaveUserMessage && userMessage) {
+        if (!client.skipSaveUserMessage && userMessage && !isPrivateMode) {
           await saveMessage(req, userMessage, {
             context: 'api/server/controllers/agents/request.js - resumable user message',
           });
@@ -280,7 +283,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         // CRITICAL: Save response message BEFORE emitting final event.
         // This prevents race conditions where the client sends a follow-up message
         // before the response is saved to the database, causing orphaned parentMessageIds.
-        if (client.savedMessageIds && !client.savedMessageIds.has(messageId)) {
+        if (client.savedMessageIds && !client.savedMessageIds.has(messageId) && !isPrivateMode) {
           await saveMessage(
             req,
             { ...response, user: userId, unfinished: wasAbortedBeforeComplete },
@@ -454,6 +457,7 @@ const _LegacyAgentController = async (req, res, next, initializeClient, addTitle
   // Match the same logic used for conversationId generation above
   const isNewConvo = !reqConversationId || reqConversationId === 'new';
   const userId = req.user.id;
+  const isPrivateMode = req.body?.isTemporary === true;
 
   // Create handler to avoid capturing the entire parent scope
   let getReqData = (data = {}) => {
@@ -659,7 +663,7 @@ const _LegacyAgentController = async (req, res, next, initializeClient, addTitle
       res.end();
 
       // Save the message if needed
-      if (client.savedMessageIds && !client.savedMessageIds.has(messageId)) {
+      if (client.savedMessageIds && !client.savedMessageIds.has(messageId) && !isPrivateMode) {
         await saveMessage(
           req,
           { ...finalResponse, user: userId },
@@ -689,7 +693,7 @@ const _LegacyAgentController = async (req, res, next, initializeClient, addTitle
     }
 
     // Save user message if needed
-    if (!client.skipSaveUserMessage) {
+    if (!client.skipSaveUserMessage && !isPrivateMode) {
       await saveMessage(req, userMessage, {
         context: "api/server/controllers/agents/request.js - don't skip saving user message",
       });

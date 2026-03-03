@@ -909,6 +909,30 @@ class BaseClient {
   async loadHistory(conversationId, parentMessageId = null) {
     logger.debug('[BaseClient] Loading history:', { conversationId, parentMessageId });
 
+    const clientMessages = this.options?.req?.body?.messages;
+    if (Array.isArray(clientMessages) && clientMessages.length > 0) {
+      let mapMethod = null;
+      if (this.getMessageMapMethod) {
+        mapMethod = this.getMessageMapMethod();
+      }
+      let _messages = this.constructor.getMessagesForConversation({
+        messages: clientMessages,
+        parentMessageId,
+        mapMethod,
+      });
+      _messages = await this.addPreviousAttachments(_messages);
+      if (!this.shouldSummarize) {
+        return _messages;
+      }
+      for (let i = _messages.length - 1; i >= 0; i--) {
+        if (_messages[i]?.summary) {
+          this.previous_summary = _messages[i];
+          break;
+        }
+      }
+      return _messages;
+    }
+
     const messages = (await getMessages({ conversationId })) ?? [];
 
     if (messages.length === 0) {
