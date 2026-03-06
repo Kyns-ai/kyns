@@ -93,30 +93,25 @@ const errorMessages = {
   },
   message_limit: (json: TMessageLimit) => {
     const { max, windowInMinutes } = json;
-    const plural = max > 1 ? 's' : '';
-    return `You hit the message limit. You have a cap of ${max} message${plural} per ${
-      windowInMinutes > 1 ? `${windowInMinutes} minutes` : 'minute'
-    }.`;
+    return `🔓 Você atingiu o limite de ${max} mensagens a cada ${windowInMinutes} minutos. Aguarde um momento e tente novamente.`;
   },
   token_balance: (json: TTokenBalance) => {
-    const { balance, tokenCost, promptTokens, generations } = json;
-    const message = `Insufficient Funds! Balance: ${balance}. Prompt tokens: ${promptTokens}. Cost: ${tokenCost}.`;
     return (
       <>
-        {message}
-        {generations && (
-          <>
+        <div style={{ textAlign: 'center', padding: '12px 0' }}>
+          <p style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
+            🔓 Seus créditos diários acabaram
+          </p>
+          <p style={{ fontSize: '14px', opacity: 0.85, lineHeight: '1.5' }}>
+            O KYNS é uma iniciativa gratuita em nome da liberdade de informação.
+            Infelizmente ainda não conseguimos oferecer mensagens ilimitadas para todos.
+          </p>
+          <p style={{ fontSize: '14px', opacity: 0.85, lineHeight: '1.5', marginTop: '8px' }}>
+            Estamos trabalhando para melhorar sua experiência a cada dia.
             <br />
-            <br />
-          </>
-        )}
-        {generations && (
-          <CodeBlock
-            lang="Generations"
-            error={true}
-            codeChildren={formatJSON(JSON.stringify(generations))}
-          />
-        )}
+            <strong>Amanhã seus créditos serão renovados automaticamente.</strong>
+          </p>
+        </div>
       </>
     );
   },
