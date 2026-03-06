@@ -200,7 +200,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       name: 'Test Agent 1',
       description: 'First test agent',
       avatar: { filepath: '/avatar1.png', source: 'local' },
-      category: 'finance',
+      category: 'romance',
       authorName: 'Author 1',
       created_at: 1672531200000,
       instructions: null,
@@ -221,7 +221,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       name: 'Test Agent 2',
       description: 'Second test agent',
       avatar: { filepath: '/avatar2.png', source: 'local' },
-      category: 'finance',
+      category: 'romance',
       authorName: 'Author 2',
       created_at: 1672531200000,
       instructions: null,
@@ -263,12 +263,12 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
   describe('Query Integration', () => {
     it('should call useGetMarketplaceAgentsQuery with correct parameters for category search', () => {
       render(
-        <AgentGrid category="finance" searchQuery="test query" onSelectAgent={mockOnSelectAgent} />,
+        <AgentGrid category="romance" searchQuery="test query" onSelectAgent={mockOnSelectAgent} />,
       );
 
       expect(mockUseMarketplaceAgentsInfiniteQuery).toHaveBeenCalledWith({
         requiredPermission: 1,
-        category: 'finance',
+        category: 'romance',
         search: 'test query',
         limit: 6,
       });
@@ -320,7 +320,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <AgentGrid category="finance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
+          <AgentGrid category="romance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
         </Wrapper>,
       );
 
@@ -334,7 +334,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <AgentGrid category="finance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
+          <AgentGrid category="romance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
         </Wrapper>,
       );
 
@@ -354,7 +354,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <AgentGrid category="finance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
+          <AgentGrid category="romance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
         </Wrapper>,
       );
 
@@ -378,7 +378,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <AgentGrid category="finance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
+          <AgentGrid category="romance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
         </Wrapper>,
       );
 
@@ -399,7 +399,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <AgentGrid category="finance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
+          <AgentGrid category="romance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
         </Wrapper>,
       );
 
@@ -414,7 +414,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       render(
         <Wrapper>
           <AgentGrid
-            category="finance"
+            category="romance"
             searchQuery="automation"
             onSelectAgent={mockOnSelectAgent}
           />
@@ -441,7 +441,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       render(
         <Wrapper>
           <AgentGrid
-            category="finance"
+            category="romance"
             searchQuery="nonexistent"
             onSelectAgent={mockOnSelectAgent}
           />
@@ -472,7 +472,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <AgentGrid category="finance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
+          <AgentGrid category="romance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
         </Wrapper>,
       );
 
@@ -490,7 +490,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <AgentGrid category="finance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
+          <AgentGrid category="romance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
         </Wrapper>,
       );
 
@@ -509,7 +509,7 @@ describe('AgentGrid Integration with useGetMarketplaceAgentsQuery', () => {
       const Wrapper = createWrapper();
       render(
         <Wrapper>
-          <AgentGrid category="finance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
+          <AgentGrid category="romance" searchQuery="" onSelectAgent={mockOnSelectAgent} />
         </Wrapper>,
       );
 

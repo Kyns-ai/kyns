@@ -18,14 +18,14 @@ jest.mock('~/data-provider/Agents', () => ({
   useGetAgentCategoriesQuery: jest.fn(() => ({
     data: [
       { value: 'general', label: 'com_ui_agent_category_general' },
-      { value: 'hr', label: 'com_ui_agent_category_hr' },
-      { value: 'rd', label: 'com_ui_agent_category_rd' },
-      { value: 'finance', label: 'com_ui_agent_category_finance' },
-      { value: 'it', label: 'com_ui_agent_category_it' },
-      { value: 'sales', label: 'com_ui_agent_category_sales' },
-      { value: 'aftersales', label: 'com_ui_agent_category_aftersales' },
-      { value: 'promoted', label: 'Promoted' }, // Should be filtered out
-      { value: 'all', label: 'All' }, // Should be filtered out
+      { value: 'romance', label: 'com_ui_agent_category_romance' },
+      { value: 'rpg', label: 'com_ui_agent_category_rpg' },
+      { value: 'anime', label: 'com_ui_agent_category_anime' },
+      { value: 'wellbeing', label: 'com_ui_agent_category_wellbeing' },
+      { value: 'mysticism', label: 'com_ui_agent_category_mysticism' },
+      { value: 'relationship', label: 'com_ui_agent_category_relationship' },
+      { value: 'promoted', label: 'Promoted' },
+      { value: 'all', label: 'All' },
     ],
     isLoading: false,
     error: null,

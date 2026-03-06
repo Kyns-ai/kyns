@@ -1,7 +1,7 @@
 import type { Document, Types } from 'mongoose';
 
 export type AgentCategory = {
-  /** Unique identifier for the category (e.g., 'general', 'hr', 'finance') */
+  /** Unique identifier for the category (e.g., 'general', 'romance', 'rpg') */
   value: string;
   /** Display label for the category */
   label: string;

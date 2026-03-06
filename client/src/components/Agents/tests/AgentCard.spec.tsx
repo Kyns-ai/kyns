@@ -11,7 +11,7 @@ jest.mock('~/hooks/useLocalize', () => () => (key: string) => {
     com_agents_created_by: 'Created by',
     com_agents_agent_card_label: '{{name}} agent. {{description}}',
     com_agents_category_general: 'General',
-    com_agents_category_hr: 'Human Resources',
+    com_agents_category_romance: 'Romance',
     com_ui_by_author: 'by {{0}}',
     com_agents_description_card: '{{description}}',
   };
@@ -25,7 +25,7 @@ jest.mock('~/hooks', () => ({
       com_agents_created_by: 'Created by',
       com_agents_agent_card_label: '{{name}} agent. {{description}}',
       com_agents_category_general: 'General',
-      com_agents_category_hr: 'Human Resources',
+      com_agents_category_romance: 'Romance',
       com_ui_by_author: 'by {{0}}',
       com_agents_description_card: '{{description}}',
     };
@@ -46,8 +46,8 @@ jest.mock('~/hooks', () => ({
   useAgentCategories: () => ({
     categories: [
       { value: 'general', label: 'com_agents_category_general' },
-      { value: 'hr', label: 'com_agents_category_hr' },
-      { value: 'custom', label: 'Custom Category' }, // Non-localized custom category
+      { value: 'romance', label: 'com_agents_category_romance' },
+      { value: 'custom', label: 'Custom Category' },
     ],
   }),
   useDefaultConvo: jest.fn(() => jest.fn(() => ({}))),

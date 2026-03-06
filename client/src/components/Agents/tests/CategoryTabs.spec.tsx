@@ -14,12 +14,12 @@ jest.mock('~/hooks/useLocalize', () => () => (key: string) => {
     com_ui_no_categories: 'No categories available',
     com_agents_category_tabs_label: 'Agent Categories',
     com_ui_agent_category_general: 'General',
-    com_ui_agent_category_hr: 'HR',
-    com_ui_agent_category_rd: 'R&D',
-    com_ui_agent_category_finance: 'Finance',
-    com_ui_agent_category_it: 'IT',
-    com_ui_agent_category_sales: 'Sales',
-    com_ui_agent_category_aftersales: 'After Sales',
+    com_ui_agent_category_romance: 'Romance',
+    com_ui_agent_category_rpg: 'RPG',
+    com_ui_agent_category_anime: 'Anime',
+    com_ui_agent_category_wellbeing: 'Wellbeing',
+    com_ui_agent_category_mysticism: 'Mysticism',
+    com_ui_agent_category_relationship: 'Relationship',
   };
   return mockTranslations[key] || key;
 });
@@ -29,8 +29,8 @@ describe('CategoryTabs', () => {
     { value: 'promoted', label: 'Top Picks', description: 'Our recommended agents', count: 5 },
     { value: 'all', label: 'All', description: 'All available agents', count: 20 },
     { value: 'general', label: 'General', description: 'General purpose agents', count: 8 },
-    { value: 'hr', label: 'HR', description: 'HR agents', count: 3 },
-    { value: 'finance', label: 'Finance', description: 'Finance agents', count: 4 },
+    { value: 'romance', label: 'Romance', description: 'Romance agents', count: 3 },
+    { value: 'rpg', label: 'RPG', description: 'RPG agents', count: 4 },
   ];
 
   const mockOnChange = jest.fn();
@@ -50,12 +50,11 @@ describe('CategoryTabs', () => {
       />,
     );
 
-    // Check for provided categories
     expect(screen.getByText('Top Picks')).toBeInTheDocument();
     expect(screen.getByText('All')).toBeInTheDocument();
     expect(screen.getByText('General')).toBeInTheDocument();
-    expect(screen.getByText('HR')).toBeInTheDocument();
-    expect(screen.getByText('Finance')).toBeInTheDocument();
+    expect(screen.getByText('Romance')).toBeInTheDocument();
+    expect(screen.getByText('RPG')).toBeInTheDocument();
   });
 
   it('handles loading state properly', () => {
@@ -101,10 +100,10 @@ describe('CategoryTabs', () => {
       />,
     );
 
-    const hrTab = screen.getByText('HR');
-    await user.click(hrTab);
+    const romanceTab = screen.getByText('Romance');
+    await user.click(romanceTab);
 
-    expect(mockOnChange).toHaveBeenCalledWith('hr');
+    expect(mockOnChange).toHaveBeenCalledWith('romance');
   });
 
   it('handles promoted tab click correctly', async () => {

@@ -153,50 +153,22 @@ export function createAgentCategoryMethods(mongoose: typeof import('mongoose')) 
   async function ensureDefaultCategories(): Promise<boolean> {
     const AgentCategory = mongoose.models.AgentCategory as Model<IAgentCategory>;
 
-    const defaultCategories = [
-      {
-        value: 'general',
-        label: 'com_agents_category_general',
-        description: 'com_agents_category_general_description',
-        order: 0,
-      },
-      {
-        value: 'romance',
-        label: 'com_agents_category_romance',
-        description: 'com_agents_category_romance_description',
-        order: 1,
-      },
-      {
-        value: 'rpg',
-        label: 'com_agents_category_rpg',
-        description: 'com_agents_category_rpg_description',
-        order: 2,
-      },
-      {
-        value: 'anime',
-        label: 'com_agents_category_anime',
-        description: 'com_agents_category_anime_description',
-        order: 3,
-      },
-      {
-        value: 'wellbeing',
-        label: 'com_agents_category_wellbeing',
-        description: 'com_agents_category_wellbeing_description',
-        order: 4,
-      },
-      {
-        value: 'mysticism',
-        label: 'com_agents_category_mysticism',
-        description: 'com_agents_category_mysticism_description',
-        order: 5,
-      },
-      {
-        value: 'relationship',
-        label: 'com_agents_category_relationship',
-        description: 'com_agents_category_relationship_description',
-        order: 6,
-      },
+    const defaultCategories: Array<{
+      value: string;
+      label: string;
+      description: string;
+      order: number;
+    }> = [
+      { value: 'general', label: 'com_agents_category_general', description: 'com_agents_category_general_description', order: 0 },
+      { value: 'romance', label: 'com_agents_category_romance', description: 'com_agents_category_romance_description', order: 1 },
+      { value: 'rpg', label: 'com_agents_category_rpg', description: 'com_agents_category_rpg_description', order: 2 },
+      { value: 'anime', label: 'com_agents_category_anime', description: 'com_agents_category_anime_description', order: 3 },
+      { value: 'wellbeing', label: 'com_agents_category_wellbeing', description: 'com_agents_category_wellbeing_description', order: 4 },
+      { value: 'mysticism', label: 'com_agents_category_mysticism', description: 'com_agents_category_mysticism_description', order: 5 },
+      { value: 'relationship', label: 'com_agents_category_relationship', description: 'com_agents_category_relationship_description', order: 6 },
     ];
+
+    const deprecatedCategoryValues = ['hr', 'rd', 'finance', 'it', 'sales', 'aftersales'];
 
     const existingCategories = await getAllCategories();
     const existingCategoryMap = new Map(existingCategories.map((cat) => [cat.value, cat]));
@@ -244,7 +216,12 @@ export function createAgentCategoryMethods(mongoose: typeof import('mongoose')) 
       await AgentCategory.bulkWrite(bulkOps, { ordered: false });
     }
 
-    return updates.length > 0 || created > 0;
+    const deactivated = await AgentCategory.updateMany(
+      { value: { $in: deprecatedCategoryValues } },
+      { $set: { isActive: false } },
+    );
+
+    return updates.length > 0 || created > 0 || (deactivated.modifiedCount ?? 0) > 0;
   }
 
   return {
