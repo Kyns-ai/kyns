@@ -152,6 +152,15 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     throw new Error('Agent not found');
   }
 
+  if (primaryAgent.provider) {
+    const normalized = Object.values(EModelEndpoint).find(
+      (v) => v.toLowerCase() === primaryAgent.provider.toLowerCase(),
+    );
+    if (normalized) {
+      primaryAgent.provider = normalized;
+    }
+  }
+
   const modelsConfig = await getModelsConfig(req);
   const validationResult = await validateAgentModel({
     req,
