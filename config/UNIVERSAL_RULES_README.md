@@ -24,11 +24,11 @@ A alteração 4 (revisar cada exemplo para terminar com pergunta/gancho) **não*
    - **Opção A:** Usar o Agent Builder na UI: para cada agente, colar as `instructions` do `agents-with-universal-rules.json`.
    - **Opção B:** Se tiver um fluxo de PATCH/update por API, usar esse JSON como fonte das instruções.
 
-3. **Cael, Dr. Mente v2, Oráculo v2:** O documento original pede substituir Dr. Mente e Oráculo por versões em arquivos `.md` separados e adicionar Cael. Esses 3 ficam de fora deste script; use os prompts v2/Cael quando tiver os arquivos.
+3. **Dr. Mente v2, Oráculo v2:** Continuam em arquivos `.md` separados. **Cael** está incluído no `agents-11-final.json` quando o MD de origem for o `KYNS-11-characters-FINAL-com-regras-2.md` (versão com prompt completo do Cael).
 
 ## Ficheiros
 
 - `apply-universal-rules-to-agents.js` — script que aplica as regras 1–3 e Safety a um `agents.json`
-- `build-agents-from-final-md.js` — extrai os 8 prompts completos do MD final e gera `agents-11-final.json`
+- `build-agents-from-final-md.js` — extrai os prompts completos do MD (1–7, 10 e 11 Cael) e gera `agents-11-final.json`
 - `agents-with-universal-rules.json` — 10 agentes com regras 1–3 e Safety (exemplos não revistos)
-- `agents-11-final.json` — **8 agentes versão FINAL** (Luna, Marina, Ísis, Viktor, Gojo, Dante, O Mestre, Nala) com regras 1–3, Safety e exemplos com finais abertos, gerado a partir de `docs/KYNS-11-characters-FINAL-com-regras.md`
+- `agents-11-final.json` — **9 agentes versão FINAL** (Luna, Marina, Ísis, Viktor, Gojo, Dante, O Mestre, Nala, **Cael**) quando gerado a partir de `KYNS-11-characters-FINAL-com-regras-2.md`

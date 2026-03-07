@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * Builds agents.json from KYNS-11-characters-FINAL-com-regras.md
- * Extracts the 8 full prompts (Luna, Marina, Ísis, Viktor, Gojo, Dante, O Mestre, Nala)
- * and merges with existing agent metadata (description, provider, model, etc.).
+ * Builds agents.json from KYNS-11-characters-FINAL-com-regras.md (or -2.md with Cael).
+ * Extracts full prompts (1-7, 10, and 11 Cael when present) and merges with existing agent metadata.
  *
  * Usage: node build-agents-from-final-md.js <path-to-md> <path-to-existing-json> [output-path]
  */
@@ -20,6 +19,8 @@ const NAME_MAP = {
   DANTE: 'Dante',
   'O MESTRE': 'O Mestre',
   NALA: 'Nala',
+  CAEL: 'Cael',
+  'CAEL (CHARACTER PRINCIPAL)': 'Cael',
 };
 
 function normalizeName(raw) {
@@ -29,7 +30,8 @@ function normalizeName(raw) {
 
 function extractPromptsFromMd(mdContent) {
   const blocks = [];
-  const charSectionRegex = /## CHARACTER (\d+): ([^\n]+)\n\*\*Config:\*\*[^\n]*\n\n```\n([\s\S]*?)```/g;
+  const charSectionRegex =
+    /## CHARACTER (\d+): ([^\n]+)\n\*\*Config:\*\*[^\n]*\n(?:\*\*Description:\*\*[^\n]*\n)?\n```\n([\s\S]*?)```/g;
   let m;
   while ((m = charSectionRegex.exec(mdContent)) !== null) {
     const num = parseInt(m[1], 10);
@@ -40,6 +42,23 @@ function extractPromptsFromMd(mdContent) {
   }
   return blocks;
 }
+
+const DEFAULT_CAEL = {
+  name: 'Cael',
+  description:
+    'Um aliado masculino lúcido e confiável. Direto, calmo e firme. Feito pra te ajudar a sair da confusão, controlar a emoção e agir com mais clareza.',
+  category: 'general',
+  provider: 'openAI',
+  model: 'Olafangensan/GLM-4.7-Flash-heretic',
+  model_parameters: {
+    temperature: 0.7,
+    top_p: 0.9,
+    max_tokens: 500,
+    maxContextTokens: 8192,
+    frequency_penalty: 0.1,
+    presence_penalty: 0.1,
+  },
+};
 
 function main() {
   const mdPath = process.argv[2] || path.join(process.env.HOME || '', 'Downloads', 'KYNS-11-characters-FINAL-com-regras.md');
@@ -52,11 +71,21 @@ function main() {
   const existing = JSON.parse(fs.readFileSync(existingPath, 'utf8'));
   const byName = new Map(existing.map((a) => [a.name, a]));
 
-  const order = ['Luna', 'Marina', 'Ísis', 'Viktor', 'Gojo Satoru', 'Dante', 'O Mestre', 'Nala'];
+  const order = [
+    'Luna',
+    'Marina',
+    'Ísis',
+    'Viktor',
+    'Gojo Satoru',
+    'Dante',
+    'O Mestre',
+    'Nala',
+    'Cael',
+  ];
   const result = [];
   for (const { name, instructions } of extracted) {
     if (!order.includes(name)) continue;
-    const base = byName.get(name);
+    const base = byName.get(name) || (name === 'Cael' ? DEFAULT_CAEL : null);
     if (!base) {
       console.warn('No base agent for:', name);
       continue;
