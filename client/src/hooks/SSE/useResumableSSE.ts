@@ -19,7 +19,6 @@ import type { EventHandlerParams } from './useEventHandlers';
 import { useGetStartupConfig, useGetUserBalance, queueTitleGeneration } from '~/data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
-import useLocalize from '~/hooks/useLocalize';
 import useEventHandlers from './useEventHandlers';
 import store from '~/store';
 
@@ -65,7 +64,6 @@ export default function useResumableSSE(
   const setActiveRunId = useSetRecoilState(store.activeRunFamily(runIndex));
 
   const { token, isAuthenticated } = useAuthContext();
-  const localize = useLocalize();
 
   /**
    * Optimistically add a job ID to the active jobs cache.
@@ -350,21 +348,15 @@ export default function useResumableSSE(
         /* @ts-ignore - sse.js types don't expose responseCode */
         const responseCode = e.responseCode;
 
-        // 404 means job doesn't exist (wrong instance or expired) - show user-facing error
+        // 404 means job doesn't exist (completed/deleted) - don't retry
         if (responseCode === 404) {
-          console.log('[ResumableSSE] Stream not found (404) - job completed or wrong instance');
+          console.log('[ResumableSSE] Stream not found (404) - job completed or expired');
           sse.close();
           removeActiveJob(currentStreamId);
           setIsSubmitting(false);
           setShowStopButton(false);
           setStreamId(null);
           reconnectAttemptRef.current = 0;
-          errorHandler({
-            data: {
-              text: localize('com_agents_error_stream_not_found_message'),
-            } as unknown as Parameters<typeof errorHandler>[0]['data'],
-            submission: currentSubmission as EventSubmission,
-          });
           return;
         }
 
@@ -555,244 +547,12 @@ export default function useResumableSSE(
   );
 
   /**
-   * Consume agent stream when backend returns it inline (no Redis / legacy mode).
-   * Parses SSE from the POST response body and dispatches to the same handlers as GET stream.
-   */
-  const subscribeToInlineStream = useCallback(
-    async (response: Response, currentSubmission: TSubmission) => {
-      const streamId = 'inline';
-      let userMessage = currentSubmission.userMessage;
-      let textIndex: number | null = null;
-      const state = { userMessage, textIndex };
-
-      const processEvent = (data: Record<string, unknown>) => {
-        if (data.final != null) {
-          clearDraft(currentSubmission.conversation?.conversationId);
-          try {
-            finalHandler(data as Parameters<typeof finalHandler>[0], currentSubmission as EventSubmission);
-          } catch {
-            setIsSubmitting(false);
-            setShowStopButton(false);
-          }
-          clearStepMaps();
-          removeActiveJob(streamId);
-          (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
-          setStreamId(null);
-          return;
-        }
-        if (data.created != null) {
-          const runId = v4();
-          setActiveRunId(runId);
-          state.userMessage = {
-            ...state.userMessage,
-            ...(data.message as Record<string, unknown>),
-            overrideParentMessageId: state.userMessage.overrideParentMessageId,
-          } as TMessage;
-          createdHandler(
-            data as Parameters<typeof createdHandler>[0],
-            { ...currentSubmission, userMessage: state.userMessage } as EventSubmission,
-          );
-          return;
-        }
-        if (data.event === 'attachment' && data.data) {
-          attachmentHandler({
-            data: data.data as Parameters<typeof attachmentHandler>[0]['data'],
-            submission: currentSubmission as EventSubmission,
-          });
-          return;
-        }
-        if (data.event != null) {
-          stepHandler(data as Parameters<typeof stepHandler>[0], {
-            ...currentSubmission,
-            userMessage: state.userMessage,
-          } as EventSubmission);
-          return;
-        }
-        if (data.sync != null) {
-          const runId = v4();
-          setActiveRunId(runId);
-          const syncData = data as { resumeState?: { runSteps?: unknown[]; aggregatedContent?: unknown; responseMessageId?: string } };
-          if (syncData.resumeState?.runSteps) {
-            for (const runStep of syncData.resumeState.runSteps) {
-              stepHandler(
-                { event: 'on_run_step', data: runStep },
-                { ...currentSubmission, userMessage: state.userMessage } as EventSubmission,
-              );
-            }
-          }
-          if (syncData.resumeState?.aggregatedContent && state.userMessage?.messageId) {
-            const messages = getMessages() ?? [];
-            const userMsgId = state.userMessage.messageId;
-            const serverResponseId = syncData.resumeState.responseMessageId;
-            let responseIdx = serverResponseId
-              ? messages.findIndex((m) => m.messageId === serverResponseId)
-              : -1;
-            if (responseIdx < 0) {
-              responseIdx = messages.findIndex(
-                (m) =>
-                  !m.isCreatedByUser &&
-                  (m.messageId === `${userMsgId}_` || m.parentMessageId === userMsgId),
-              );
-            }
-            if (responseIdx >= 0) {
-              const updated = [...messages];
-              updated[responseIdx] = {
-                ...updated[responseIdx],
-                content: syncData.resumeState.aggregatedContent,
-              };
-              setMessages(updated);
-              resetContentHandler();
-              syncStepMessage(updated[responseIdx]);
-            } else {
-              const responseId = serverResponseId ?? `${userMsgId}_`;
-              setMessages([
-                ...messages,
-                {
-                  messageId: responseId,
-                  parentMessageId: userMsgId,
-                  conversationId: currentSubmission.conversation?.conversationId ?? '',
-                  text: '',
-                  content: syncData.resumeState.aggregatedContent,
-                  isCreatedByUser: false,
-                } as TMessage,
-              ]);
-            }
-          }
-          setIsSubmitting(true);
-          setShowStopButton(true);
-          return;
-        }
-        if (data.type != null) {
-          const { text, index } = data as { text?: string; index?: number };
-          if (text != null && index !== state.textIndex) {
-            state.textIndex = index ?? null;
-          }
-          contentHandler({
-            data: data as Parameters<typeof contentHandler>[0]['data'],
-            submission: currentSubmission as EventSubmission,
-          });
-          return;
-        }
-        if (data.message != null) {
-          const msgData = data as {
-            text?: string;
-            response?: string;
-            parentMessageId?: string;
-            messageId?: string;
-          };
-          const text = msgData.text ?? msgData.response;
-          const initialResponse = {
-            ...(currentSubmission.initialResponse as TMessage),
-            parentMessageId: msgData.parentMessageId,
-            messageId: msgData.messageId,
-          };
-          messageHandler(text, {
-            ...currentSubmission,
-            userMessage: state.userMessage,
-            initialResponse,
-          } as EventSubmission);
-        }
-      };
-
-      setAbortScroll(false);
-      setIsSubmitting(true);
-      setShowStopButton(true);
-
-      try {
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        if (!reader) {
-          throw new Error('No response body');
-        }
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const parts = buffer.split('\n\n');
-          buffer = parts.pop() ?? '';
-          for (const part of parts) {
-            if (!part.trim()) continue;
-            let eventType = 'message';
-            let dataStr = '';
-            for (const line of part.split('\n')) {
-              if (line.startsWith('event: ')) {
-                eventType = line.slice(7).trim();
-              } else if (line.startsWith('data: ')) {
-                dataStr = line.slice(6);
-              }
-            }
-            if (eventType === 'error') {
-              try {
-                const errMsg = JSON.parse(dataStr) as string;
-                errorHandler({
-                  data: { text: errMsg } as unknown as Parameters<typeof errorHandler>[0]['data'],
-                  submission: currentSubmission as EventSubmission,
-                });
-              } catch {
-                errorHandler({
-                  data: { text: dataStr } as unknown as Parameters<typeof errorHandler>[0]['data'],
-                  submission: currentSubmission as EventSubmission,
-                });
-              }
-              setIsSubmitting(false);
-              setShowStopButton(false);
-              removeActiveJob(streamId);
-              setStreamId(null);
-              return;
-            }
-            try {
-              const data = JSON.parse(dataStr) as Record<string, unknown>;
-              processEvent(data);
-            } catch {
-              // skip malformed chunk
-            }
-          }
-        }
-      } catch (err) {
-        console.error('[ResumableSSE] Inline stream error:', err);
-        errorHandler({ data: undefined, submission: currentSubmission as EventSubmission });
-        removeActiveJob(streamId);
-        setStreamId(null);
-      } finally {
-        setIsSubmitting(false);
-        setShowStopButton(false);
-      }
-    },
-    [
-      clearDraft,
-      finalHandler,
-      clearStepMaps,
-      removeActiveJob,
-      setStreamId,
-      setAbortScroll,
-      setActiveRunId,
-      setIsSubmitting,
-      setShowStopButton,
-      createdHandler,
-      attachmentHandler,
-      stepHandler,
-      getMessages,
-      setMessages,
-      resetContentHandler,
-      syncStepMessage,
-      contentHandler,
-      messageHandler,
-      errorHandler,
-      startupConfig?.balance?.enabled,
-      balanceQuery,
-    ],
-  );
-
-  /**
-   * Start generation (POST request).
-   * When backend uses Redis: returns streamId, client then GETs the stream.
-   * When backend has no Redis (legacy): response is the stream itself (inline).
+   * Start generation (POST request that returns streamId)
+   * Uses request.post which has axios interceptors for automatic token refresh.
+   * Retries up to 3 times on network errors with exponential backoff.
    */
   const startGeneration = useCallback(
-    async (
-      currentSubmission: TSubmission,
-    ): Promise<string | { inlineStream: Response } | null> => {
+    async (currentSubmission: TSubmission): Promise<string | null> => {
       const payloadData = createPayload(currentSubmission);
       let { payload } = payloadData;
       payload = removeNullishValues(payload) as TPayload;
@@ -806,32 +566,8 @@ export default function useResumableSSE(
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(payload),
-          });
-
-          const contentType = res.headers.get('content-type') ?? '';
-          if (contentType.includes('text/event-stream')) {
-            console.log('[ResumableSSE] Inline stream (legacy mode, no Redis)');
-            return { inlineStream: res };
-          }
-
-          if (!res.ok) {
-            const errBody = await res.text();
-            try {
-              lastError = { status: res.status, data: JSON.parse(errBody) };
-            } catch {
-              lastError = { status: res.status, data: errBody };
-            }
-            break;
-          }
-
-          const data = (await res.json()) as { streamId: string };
+          // Use request.post which handles auth token refresh via axios interceptors
+          const data = (await request.post(url, payload)) as { streamId: string };
           console.log('[ResumableSSE] Generation started:', { streamId: data.streamId });
           return data.streamId;
         } catch (error) {
@@ -858,8 +594,8 @@ export default function useResumableSSE(
 
       console.error('[ResumableSSE] Error starting generation:', lastError);
 
-      const err = lastError as { status?: number; data?: Record<string, unknown> };
-      const errorData = err?.data;
+      const axiosError = lastError as { response?: { data?: Record<string, unknown> } };
+      const errorData = axiosError?.response?.data;
       if (errorData) {
         errorHandler({
           data: { text: JSON.stringify(errorData) } as unknown as Parameters<
@@ -873,7 +609,7 @@ export default function useResumableSSE(
       setIsSubmitting(false);
       return null;
     },
-    [clearStepMaps, errorHandler, setIsSubmitting, token],
+    [clearStepMaps, errorHandler, setIsSubmitting],
   );
 
   useEffect(() => {
@@ -917,21 +653,19 @@ export default function useResumableSSE(
         addActiveJob(resumeStreamId);
         subscribeToStream(resumeStreamId, submission, true); // isResume=true
       } else {
-        // New generation: start and then subscribe (or consume inline stream when no Redis)
+        // New generation: start and then subscribe
         console.log('[ResumableSSE] Starting NEW generation');
-        const result = await startGeneration(submission);
-        if (result && typeof result === 'object' && 'inlineStream' in result) {
-          setStreamId('inline');
-          addActiveJob('inline');
-          subscribeToInlineStream(result.inlineStream, submission);
-        } else if (typeof result === 'string') {
-          setStreamId(result);
-          addActiveJob(result);
+        const newStreamId = await startGeneration(submission);
+        if (newStreamId) {
+          setStreamId(newStreamId);
+          // Optimistically add to active jobs
+          addActiveJob(newStreamId);
+          // Queue title generation if this is a new conversation (first message)
           const isNewConvo = submission.userMessage?.parentMessageId === Constants.NO_PARENT;
           if (isNewConvo) {
-            queueTitleGeneration(result);
+            queueTitleGeneration(newStreamId);
           }
-          subscribeToStream(result, submission);
+          subscribeToStream(newStreamId, submission);
         } else {
           console.error('[ResumableSSE] Failed to get streamId from startGeneration');
         }

@@ -208,7 +208,6 @@ const startServer = async () => {
     const streamServices = createStreamServices();
     GenerationJobManager.configure(streamServices);
     GenerationJobManager.initialize();
-    app.set('agentStreamUseRedis', streamServices.isRedis === true);
 
     const inspectFlags = process.execArgv.some((arg) => arg.startsWith('--inspect'));
     if (inspectFlags || isEnabled(process.env.MEM_DIAG)) {
