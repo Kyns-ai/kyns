@@ -43,7 +43,7 @@ function applyUniversalRules(instructions) {
   }
 
   // 2. Add the two new rules at the end of ## Rules (before next ## section)
-  const rulesEndRegex = /(## Rules\n[\s\S]*)(\n## [A-Za-z])/;
+  const rulesEndRegex = /(## Rules\n[\s\S]*)(\n## [A-Za-z][^\n]*)/;
   if (rulesEndRegex.test(out)) {
     const alreadyHasOpenHook = out.includes('CRITICAL: EVERY response MUST end with an open hook');
     const alreadyHasAntiLLM = out.includes('Sound like a PERSON, not like an AI');
