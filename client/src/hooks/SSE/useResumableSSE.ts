@@ -19,7 +19,7 @@ import type { EventHandlerParams } from './useEventHandlers';
 import { useGetStartupConfig, useGetUserBalance, queueTitleGeneration } from '~/data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
-import { useLocalize } from '~/hooks/useLocalize';
+import useLocalize from '~/hooks/useLocalize';
 import useEventHandlers from './useEventHandlers';
 import store from '~/store';
 
