@@ -153,6 +153,7 @@ endpoints:
     summarize: true
     summaryModel: "llmfan46/Qwen3.5-27B-heretic-v2"
     addParams:
+      timeout: 300000
       chat_template_kwargs:
         enable_thinking: false
   agents:
@@ -171,6 +172,7 @@ endpoints:
       summarize: true
       summaryModel: "llmfan46/Qwen3.5-27B-heretic-v2"
       addParams:
+        timeout: 300000
         chat_template_kwargs:
           enable_thinking: false
         repetition_penalty: 1.05
@@ -186,6 +188,7 @@ endpoints:
       summarize: true
       summaryModel: "llmfan46/Qwen3.5-27B-heretic-v2"
       addParams:
+        timeout: 300000
         chat_template_kwargs:
           enable_thinking: true
         repetition_penalty: 1.05
