@@ -1,5 +1,6 @@
 import { memo, useMemo, useState, useCallback, useRef, useId } from 'react';
 import { useAtom } from 'jotai';
+import { Lightbulb } from 'lucide-react';
 import type { MouseEvent, FocusEvent } from 'react';
 import { ContentTypes } from 'librechat-data-provider';
 import { ThinkingContent, ThinkingButton, FloatingThinkingBar } from './Thinking';
@@ -44,7 +45,6 @@ const Reasoning = memo(({ reasoning, isLast }: ReasoningProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { isSubmitting, isLatestMessage, nextType } = useMessageContext();
 
-  // Strip <think> tags from the reasoning content (modern format)
   const reasoningText = useMemo(() => {
     return reasoning
       .replace(/^<think>\s*/, '')
@@ -78,15 +78,27 @@ const Reasoning = memo(({ reasoning, isLast }: ReasoningProps) => {
   }, []);
 
   const effectiveIsSubmitting = isLatestMessage ? isSubmitting : false;
+  const isActivelyThinking = effectiveIsSubmitting && isLast;
 
   const label = useMemo(
-    () =>
-      effectiveIsSubmitting && isLast ? localize('com_ui_thinking') : localize('com_ui_thoughts'),
-    [effectiveIsSubmitting, localize, isLast],
+    () => (isActivelyThinking ? localize('com_ui_thinking') : localize('com_ui_thoughts')),
+    [isActivelyThinking, localize],
   );
 
-  if (!reasoningText || !showThinking) {
+  if (!reasoningText) {
     return null;
+  }
+
+  if (!showThinking) {
+    if (!isActivelyThinking) {
+      return null;
+    }
+    return (
+      <div className="mb-2 flex items-center gap-2 pb-2 pt-2 text-text-secondary">
+        <Lightbulb className="h-4 w-4 animate-pulse" />
+        <span className="text-sm">{localize('com_ui_thinking')}</span>
+      </div>
+    );
   }
 
   return (

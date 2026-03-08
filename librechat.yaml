@@ -152,6 +152,9 @@ endpoints:
     titleModel: "llmfan46/Qwen3.5-27B-heretic-v2"
     summarize: true
     summaryModel: "llmfan46/Qwen3.5-27B-heretic-v2"
+    addParams:
+      chat_template_kwargs:
+        enable_thinking: false
   agents:
     model: "llmfan46/Qwen3.5-27B-heretic-v2"
     provider: "openAI"

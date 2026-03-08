@@ -4,6 +4,7 @@ import { Clipboard, CheckMark, TooltipAnchor } from '@librechat/client';
 import { Lightbulb, ChevronDown, ChevronUp } from 'lucide-react';
 import type { FocusEvent, FC } from 'react';
 import { showThinkingAtom } from '~/store/showThinking';
+import { useMessageContext } from '~/Providers';
 import { fontSizeAtom } from '~/store/fontSize';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
@@ -248,6 +249,7 @@ const Thinking: React.ElementType = memo(({ children }: { children: React.ReactN
   const [isBarVisible, setIsBarVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentId = useId();
+  const { isSubmitting, isLatestMessage } = useMessageContext();
 
   const handleClick = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -274,9 +276,9 @@ const Thinking: React.ElementType = memo(({ children }: { children: React.ReactN
     }
   }, []);
 
+  const isActivelyThinking = isLatestMessage ? isSubmitting : false;
   const label = useMemo(() => localize('com_ui_thoughts'), [localize]);
 
-  // Extract text content for copy functionality
   const textContent = useMemo(() => {
     if (typeof children === 'string') {
       return children;
@@ -284,8 +286,20 @@ const Thinking: React.ElementType = memo(({ children }: { children: React.ReactN
     return '';
   }, [children]);
 
-  if (children == null || !showThinking) {
+  if (children == null) {
     return null;
+  }
+
+  if (!showThinking) {
+    if (!isActivelyThinking) {
+      return null;
+    }
+    return (
+      <div className="mb-2 flex items-center gap-2 pb-2 pt-2 text-text-secondary">
+        <Lightbulb className="h-4 w-4 animate-pulse" />
+        <span className="text-sm">{localize('com_ui_thinking')}</span>
+      </div>
+    );
   }
 
   return (
