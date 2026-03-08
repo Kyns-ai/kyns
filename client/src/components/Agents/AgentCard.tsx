@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Label, OGDialog, OGDialogTrigger } from '@librechat/client';
 import {
@@ -10,10 +11,9 @@ import {
   AgentListResponse,
 } from 'librechat-data-provider';
 import type t from 'librechat-data-provider';
-import { useLocalize, TranslationKeys, useAgentCategories, useDefaultConvo } from '~/hooks';
-import { cn, renderAgentAvatar, getContactDisplayName, clearMessagesCache } from '~/utils';
+import { useLocalize, TranslationKeys, useAgentCategories } from '~/hooks';
+import { cn, renderAgentAvatar, getContactDisplayName } from '~/utils';
 import AgentDetailContent from './AgentDetailContent';
-import { useChatContext } from '~/Providers';
 import { Info } from 'lucide-react';
 
 interface AgentCardProps {
@@ -28,10 +28,9 @@ interface AgentCardProps {
  */
 const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }) => {
   const localize = useLocalize();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { categories } = useAgentCategories();
-  const getDefaultConversation = useDefaultConvo();
-  const { conversation, newConversation } = useChatContext();
   const [isOpen, setIsOpen] = useState(false);
 
   const categoryLabel = useMemo(() => {
@@ -63,27 +62,18 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onSelect, className = '' }
     }
 
     localStorage.setItem(`${LocalStorageKeys.AGENT_ID_PREFIX}0`, agent.id);
-    clearMessagesCache(queryClient, conversation?.conversationId);
+    localStorage.setItem(
+      `${LocalStorageKeys.LAST_CONVO_SETUP}_0`,
+      JSON.stringify({
+        endpoint: EModelEndpoint.agents,
+        agent_id: agent.id,
+        conversationId: Constants.NEW_CONVO,
+      }),
+    );
+
     queryClient.invalidateQueries([QueryKeys.messages]);
-
-    const template = {
-      conversationId: Constants.NEW_CONVO as string,
-      endpoint: EModelEndpoint.agents,
-      agent_id: agent.id,
-      title: localize('com_agents_chat_with', { name: agent.name || localize('com_ui_agent') }),
-    };
-
-    const currentConvo = getDefaultConversation({
-      conversation: { ...(conversation ?? {}), ...template },
-      preset: template,
-    });
-
-    newConversation({ template: currentConvo, preset: template });
-
-    if (onSelect) {
-      onSelect(agent);
-    }
-  }, [agent, queryClient, conversation, getDefaultConversation, newConversation, localize, onSelect]);
+    navigate(`/c/${Constants.NEW_CONVO}`, { state: { focusChat: true } });
+  }, [agent, queryClient, navigate]);
 
   const handleInfoClick = useCallback(
     (e: React.MouseEvent) => {
