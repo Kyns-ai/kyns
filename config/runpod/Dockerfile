@@ -1,3 +1,3 @@
-FROM runpod/worker-vllm:v2.14.0
+FROM registry.runpod.net/runpod-workers-worker-vllm-main-dockerfile:17efb0e7d
 
 RUN pip install --no-cache-dir git+https://github.com/huggingface/transformers.git
