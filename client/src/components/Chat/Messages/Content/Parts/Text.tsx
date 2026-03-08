@@ -1,10 +1,12 @@
-import { memo, useMemo, ReactElement } from 'react';
+import { memo, useMemo, useEffect, useRef, useState, type ReactElement } from 'react';
 import { useRecoilValue } from 'recoil';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
 import Markdown from '~/components/Chat/Messages/Content/Markdown';
 import { useMessageContext } from '~/Providers';
 import { cn } from '~/utils';
 import store from '~/store';
+
+const CHARS_PER_FRAME = 4;
 
 type TextPartProps = {
   text: string;
@@ -21,16 +23,63 @@ const TextPart = memo(({ text, isCreatedByUser, showCursor }: TextPartProps) => 
   const { isSubmitting = false, isLatestMessage = false } = useMessageContext();
   const enableUserMsgMarkdown = useRecoilValue(store.enableUserMsgMarkdown);
   const showCursorState = useMemo(() => showCursor && isSubmitting, [showCursor, isSubmitting]);
+  const [displayedLength, setDisplayedLength] = useState(() => text.length);
+  const rafRef = useRef<number | null>(null);
+  const targetLenRef = useRef(text.length);
+
+  useEffect(() => {
+    if (!isSubmitting || !isLatestMessage || isCreatedByUser) {
+      setDisplayedLength(text.length);
+      targetLenRef.current = text.length;
+      return;
+    }
+    targetLenRef.current = text.length;
+    if (text.length <= displayedLength) {
+      return;
+    }
+
+    const tick = () => {
+      setDisplayedLength((current) => {
+        const target = targetLenRef.current;
+        const next = Math.min(current + CHARS_PER_FRAME, target);
+        if (next < target) {
+          rafRef.current = requestAnimationFrame(tick);
+        }
+        return next;
+      });
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [text, isSubmitting, isLatestMessage, isCreatedByUser]);
+
+  useEffect(() => {
+    if (!isSubmitting && text.length > 0) {
+      setDisplayedLength(text.length);
+      targetLenRef.current = text.length;
+    }
+  }, [isSubmitting, text.length]);
+
+  const visibleText = useMemo(() => {
+    if (!isSubmitting || !isLatestMessage || isCreatedByUser || displayedLength >= text.length) {
+      return text;
+    }
+    return text.slice(0, displayedLength);
+  }, [text, displayedLength, isSubmitting, isLatestMessage, isCreatedByUser]);
 
   const content: ContentType = useMemo(() => {
     if (!isCreatedByUser) {
-      return <Markdown content={text} isLatestMessage={isLatestMessage} />;
+      return <Markdown content={visibleText} isLatestMessage={isLatestMessage} />;
     } else if (enableUserMsgMarkdown) {
-      return <MarkdownLite content={text} />;
+      return <MarkdownLite content={visibleText} />;
     } else {
-      return <>{text}</>;
+      return <>{visibleText}</>;
     }
-  }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage]);
+  }, [isCreatedByUser, enableUserMsgMarkdown, visibleText, isLatestMessage]);
 
   return (
     <div

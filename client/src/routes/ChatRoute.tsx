@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRecoilCallback, useRecoilValue } from 'recoil';
 import { Spinner, useToastContext } from '@librechat/client';
-import { Constants, EModelEndpoint } from 'librechat-data-provider';
+import { Constants, EModelEndpoint, LocalStorageKeys } from 'librechat-data-provider';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
 import type { TPreset } from 'librechat-data-provider';
 import {
@@ -81,14 +81,41 @@ export default function ChatRoute() {
     }
 
     if (conversationId === Constants.NEW_CONVO && endpointsQuery.data && modelsQuery.data) {
-      const result = getDefaultModelSpec(startupConfig);
-      const spec = result?.default ?? result?.last;
-      logger.log('conversation', 'ChatRoute, new convo effect', conversation);
-      newConversation({
-        modelsData: modelsQuery.data,
-        template: conversation ? conversation : undefined,
-        ...(spec ? { preset: getModelSpecPreset(spec) } : {}),
-      });
+      const lastSetupRaw = localStorage.getItem(`${LocalStorageKeys.LAST_CONVO_SETUP}_0`);
+      const lastSetup = lastSetupRaw ? (() => {
+        try {
+          return JSON.parse(lastSetupRaw) as { endpoint?: string; agent_id?: string };
+        } catch {
+          return {};
+        }
+      })() : {};
+      const isAgentStart = lastSetup.endpoint === EModelEndpoint.agents && lastSetup.agent_id;
+
+      if (isAgentStart) {
+        logger.log('conversation', 'ChatRoute, new convo from agent card', lastSetup);
+        newConversation({
+          modelsData: modelsQuery.data,
+          template: {
+            ...(conversation ?? {}),
+            endpoint: EModelEndpoint.agents,
+            agent_id: lastSetup.agent_id,
+            conversationId: Constants.NEW_CONVO,
+          },
+          preset: {
+            endpoint: EModelEndpoint.agents,
+            agent_id: lastSetup.agent_id,
+          },
+        });
+      } else {
+        const result = getDefaultModelSpec(startupConfig);
+        const spec = result?.default ?? result?.last;
+        logger.log('conversation', 'ChatRoute, new convo effect', conversation);
+        newConversation({
+          modelsData: modelsQuery.data,
+          template: conversation ? conversation : undefined,
+          ...(spec ? { preset: getModelSpecPreset(spec) } : {}),
+        });
+      }
 
       hasSetConversation.current = true;
     } else if (initialConvoQuery.data && endpointsQuery.data && modelsQuery.data) {

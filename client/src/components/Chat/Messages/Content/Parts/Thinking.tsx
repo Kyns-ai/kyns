@@ -291,15 +291,15 @@ const Thinking: React.ElementType = memo(({ children }: { children: React.ReactN
   }
 
   if (!showThinking) {
-    if (!isActivelyThinking) {
-      return null;
+    if (isActivelyThinking) {
+      return (
+        <div className="mb-2 flex items-center gap-2 pb-2 pt-2 text-text-secondary">
+          <Lightbulb className="h-4 w-4 animate-pulse" />
+          <span className="text-sm">{localize('com_ui_thinking')}</span>
+        </div>
+      );
     }
-    return (
-      <div className="mb-2 flex items-center gap-2 pb-2 pt-2 text-text-secondary">
-        <Lightbulb className="h-4 w-4 animate-pulse" />
-        <span className="text-sm">{localize('com_ui_thinking')}</span>
-      </div>
-    );
+    return null;
   }
 
   return (
