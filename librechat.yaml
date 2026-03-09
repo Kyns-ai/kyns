@@ -3,15 +3,18 @@ cache: true
 interface:
   endpointsMenu: false
   modelSelect: false
-  parameters: true
+  parameters: false
   sidePanel: true
   memories: true
   presets: false
-  prompts: true
+  prompts: false
   bookmarks: true
-  multiConvo: true
+  multiConvo: false
   agents: true
   webSearch: true
+  temporaryChat: false
+  runCode: false
+  customWelcome: "Olá, {{user.name}} — o que você quer saber hoje?"
   marketplace:
     use: true
 rateLimits:
@@ -179,6 +182,7 @@ endpoints:
   agents:
     model: "llmfan46/Qwen3.5-27B-heretic-v2"
     provider: "openAI"
+    disableBuilder: true
   custom:
     - name: "KYNS"
       apiKey: "${OPENAI_API_KEY}"

@@ -49,6 +49,27 @@
       .dark .dark\:hover\:decoration-green-400:hover,
       .dark .dark\:focus\:decoration-green-400:focus { text-decoration-color: #C8A86E !important; }
       .ring-green-500, .focus\:ring-green-500:focus { --tw-ring-color: rgba(200,168,110,0.5) !important; }
+      /* ─── KYNS Consumer UI: hide technical/admin elements ─────────────────── */
+
+      /* Import conversations in Settings > Data (not relevant to consumers) */
+      #import-conversation-label,
+      [aria-labelledby="import-conversation-label"],
+      [aria-label="Import"] { display: none !important; }
+
+      /* Agent API Keys section in Settings > Data */
+      [aria-labelledby="api-keys-label"],
+      #api-keys-label { display: none !important; }
+
+      /* "+" command description (multi-convo, disabled via config but tab may linger) */
+      /* Commands tab: hide +command and /command rows since multiConvo/prompts are off */
+      [data-testid="plusCommand"],
+      [data-testid="slashCommand"] { display: none !important; }
+
+      /* Hide any leftover "OpenAI / Anthropic / Azure" endpoint icons in convo headers */
+      [title="OpenAI"], [title="Anthropic"], [title="Azure OpenAI"],
+      [aria-label="OpenAI"], [aria-label="Anthropic"], [aria-label="Azure OpenAI"] {
+        display: none !important;
+      }
     </style>
     <script>
       const theme = localStorage.getItem('color-theme');
