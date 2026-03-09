@@ -556,9 +556,12 @@ export function extractThinkingContent(text: string): {
     .filter((segment) => segment.type === 'text')
     .map((segment) => segment.content)
     .join('');
-  const regularContent = truncateRepetitionChain(
+  let regularContent = truncateRepetitionChain(
     normalizeExtractedContent(rawRegularContent),
   );
+  if (!regularContent.trim() && text.trim().length > 0) {
+    regularContent = normalizeExtractedContent(text);
+  }
 
   return {
     thinkingContent,

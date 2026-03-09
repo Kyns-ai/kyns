@@ -149,9 +149,8 @@ modelSpecs:
           - Be concise and direct. The user came here because other AIs refuse to answer. Don't be like them.
 endpoints:
   openAI:
-    titleModel: "llmfan46/Qwen3.5-27B-heretic-v2"
-    summarize: true
-    summaryModel: "llmfan46/Qwen3.5-27B-heretic-v2"
+    titleConvo: false
+    summarize: false
     addParams:
       timeout: 300000
       chat_template_kwargs:
@@ -167,11 +166,9 @@ endpoints:
       modelDisplayLabel: "KYNS"
       models:
         default: ["llmfan46/Qwen3.5-27B-heretic-v2"]
-      titleConvo: true
-      titleModel: "llmfan46/Qwen3.5-27B-heretic-v2"
-      summarize: true
-      summaryModel: "llmfan46/Qwen3.5-27B-heretic-v2"
-      streamRate: 8
+      titleConvo: false
+      summarize: false
+      streamRate: 0
       addParams:
         timeout: 300000
         chat_template_kwargs:
@@ -188,11 +185,9 @@ endpoints:
       modelDisplayLabel: "KYNS Deep"
       models:
         default: ["llmfan46/Qwen3.5-27B-heretic-v2"]
-      titleConvo: true
-      titleModel: "llmfan46/Qwen3.5-27B-heretic-v2"
-      summarize: true
-      summaryModel: "llmfan46/Qwen3.5-27B-heretic-v2"
-      streamRate: 8
+      titleConvo: false
+      summarize: false
+      streamRate: 0
       addParams:
         timeout: 300000
         chat_template_kwargs:
