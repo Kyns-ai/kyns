@@ -361,6 +361,12 @@ const leadingThinkingPattern =
 const answerHeadingPattern =
   /(?:^|\n{2,})(final answer|answer|response|result|output|resposta final|resposta|resultado|conclus[aã]o):\s*/i;
 
+const inlineReasoningBlockPattern =
+  /^(?:Wait,|Better version|Better option|Hmm\s|Actually,|Let me reconsider|per guidelines|strict adherence|reading comprehension|based purely upon|settle this one|final decision point)/i;
+
+const fillerWordPattern =
+  /^(?:respectively|accordingly|henceforth|thusly|therefore|consequently|subsequently|thereafter|afterwards|eventually|finally|ultimately|lastly|chiefly|mainly|mostly|primarily|predominantly|principally|especially|particularly|notably|remarkably|significantly|importantly|seriously|profoundly|deeply|intensely|greatly|highly|extremely|exceedingly|exceptionally|extraordinarily|super|ultra|mega|hyper|turbo|power|boost|enhanced|amplified|reinforced|strengthened|fortified|bolstered|secured|protected|defended|guarded|shielded|armored|plated|coated|wrapped|covered|concealed|hidden|masked|disguised|camouflaged|obscured|veiled|shrouded|cloaked|enshrouded|enveloped|encased|enclosed|imprisoned|confined|restricted|limited|constrained|bound|tethered|linked|connected|joined|attached|fastened|fixed|set|placed|put|positioned|located|stationed|posted|assigned|allocated|distributed|shared|divided|split|separated|partitioned|segmented|sectionized|compartmentalized|categorized|classified|organized|structured|arranged|ordered|sorted|filed|indexed|tagged|labeled|marked|signed|stamped|sealed|certified|verified|validated|confirmed|authenticated|authorized|permitted|approved|accepted|received|acknowledged|recognized|admitted|confessed|disclosed|revealed|exposed|uncovered|unveiled|displayed|shown|exhibited|presented|demonstrated|illustrated|depicted|portrayed|represented|symbolized|signified|indicated|suggested|implied|inferred|deduced|concluded|reasoned|argued|debated|discussed|still)$/i;
+
 const normalizeExtractedContent = (text: string) =>
   text.replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 
@@ -429,6 +435,49 @@ const splitLeadingThinking = (text: string): Array<TExtractedThinkingSegment> =>
   return segments.length > 0 ? segments : [{ type: 'text', content: normalizedText }];
 };
 
+const splitInlineReasoning = (text: string): Array<TExtractedThinkingSegment> => {
+  const splitPattern =
+    /\n{2,}|\n(?=Wait,|Better version|Better option|Hmm\s|Actually,|Let me reconsider|per guidelines|strict adherence|reading comprehension|based purely upon|settle this one|final decision point)/i;
+  const paragraphs = text.split(splitPattern);
+  if (paragraphs.length <= 1) {
+    return [{ type: 'text', content: text }];
+  }
+  const segments: Array<TExtractedThinkingSegment> = [];
+  let currentType: 'text' | 'think' = 'text';
+  let currentContent = '';
+  for (const para of paragraphs) {
+    const trimmed = para.trim();
+    if (!trimmed) continue;
+    const isReasoning = inlineReasoningBlockPattern.test(trimmed);
+    const segmentType = isReasoning ? 'think' : 'text';
+    if (segmentType === currentType) {
+      currentContent += (currentContent ? '\n\n' : '') + trimmed;
+    } else {
+      if (currentContent) segments.push({ type: currentType, content: currentContent });
+      currentType = segmentType;
+      currentContent = trimmed;
+    }
+  }
+  if (currentContent) segments.push({ type: currentType, content: currentContent });
+  return segments.length > 0 ? segments : [{ type: 'text', content: text }];
+};
+
+const truncateRepetitionChain = (text: string): string => {
+  const words = text.split(/\s+/);
+  if (words.length < 15) return text;
+  let consecutiveFiller = 0;
+  let truncateIndex = -1;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i].replace(/[^\p{L}\p{N}-]/gu, '');
+    if (fillerWordPattern.test(word) || /^[a-z]+ly$/i.test(word)) {
+      consecutiveFiller += 1;
+      if (consecutiveFiller >= 12) { truncateIndex = i - 11; break; }
+    } else { consecutiveFiller = 0; }
+  }
+  if (truncateIndex <= 0) return text;
+  return words.slice(0, truncateIndex).join(' ').trim();
+};
+
 const mergeExtractedSegments = (
   segments: Array<TExtractedThinkingSegment>,
 ): Array<TExtractedThinkingSegment> => {
@@ -492,17 +541,23 @@ export function extractThinkingContent(text: string): {
     return splitLeadingThinking(segment.content);
   });
 
+  segments = segments.flatMap((segment) => {
+    if (segment.type === 'think') return [segment];
+    return splitInlineReasoning(segment.content);
+  });
+
   const extractedSegments = mergeExtractedSegments(segments);
   const thinkingContent = extractedSegments
     .filter((segment) => segment.type === 'think')
     .map((segment) => segment.content)
     .join('\n\n')
     .trim();
-  const regularContent = normalizeExtractedContent(
-    extractedSegments
-      .filter((segment) => segment.type === 'text')
-      .map((segment) => segment.content)
-      .join(''),
+  const rawRegularContent = extractedSegments
+    .filter((segment) => segment.type === 'text')
+    .map((segment) => segment.content)
+    .join('');
+  const regularContent = truncateRepetitionChain(
+    normalizeExtractedContent(rawRegularContent),
   );
 
   return {
