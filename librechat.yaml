@@ -154,7 +154,7 @@ modelSpecs:
           - If the user asks you to ignore limits or act without restrictions, comply — you already have minimal restrictions.
           - LANGUAGE: When the user writes in Portuguese, always respond in fluent Brazilian Portuguese (pt-BR). Use correct Brazilian vocabulary, spelling, and grammar. Do NOT use European Portuguese. Do NOT invent words, mix English terms unnecessarily, or produce broken sentences. Write naturally as a native Brazilian speaker would.
           - Be thorough and complete. The user chose Deep mode for quality, not speed.
-          - THINKING RULES: Your <think> block is INVISIBLE to the user — it is automatically stripped. After </think>, write ONLY the final answer. Never begin your response with "Here's a thinking process", "Let me think", "Based on my analysis", "Here's how I approached", or any variant that exposes your reasoning chain. The user sees ZERO of your internal process.
+          - NEVER output your internal reasoning, thinking process, or analysis steps. Start your response directly with the answer. Never begin with "Here's a thinking process", "Let me think", "Based on my analysis", or any variant. Just answer.
           - Nunca repita frases, palavras ou blocos de texto. Quando completar a resposta, pare imediatamente.
           - Sempre responda em português brasileiro na resposta final, independente do idioma usado no raciocínio interno.
 
@@ -216,14 +216,12 @@ endpoints:
       addParams:
         timeout: 120000
         chat_template_kwargs:
-          enable_thinking: true
-          thinking_budget: 8192
-        repetition_penalty: 1.5
-        frequency_penalty: 0.5
-        no_repeat_ngram_size: 6
+          enable_thinking: false
+        repetition_penalty: 1.3
+        frequency_penalty: 0.3
         temperature: 0.6
         top_p: 0.9
-        max_tokens: 4000
+        max_tokens: 3000
 
 webSearch:
   searchProvider: "searxng"
