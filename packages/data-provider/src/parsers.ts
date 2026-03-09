@@ -521,6 +521,27 @@ export function extractThinkingContent(text: string): {
     };
   }
 
+  const closeThinkTag = '</think>';
+  const closeThinkIdx = text.indexOf(closeThinkTag);
+  if (closeThinkIdx !== -1 && !text.includes('<think>')) {
+    const before = normalizeExtractedContent(text.slice(0, closeThinkIdx));
+    const after = normalizeExtractedContent(text.slice(closeThinkIdx + closeThinkTag.length));
+    const segs: Array<TExtractedThinkingSegment> = [];
+    if (before) {
+      segs.push({ type: 'think', content: before });
+    }
+    if (after) {
+      segs.push({ type: 'text', content: after });
+    }
+    if (segs.length > 0) {
+      return {
+        thinkingContent: before,
+        regularContent: after || text,
+        segments: segs,
+      };
+    }
+  }
+
   let segments: Array<TExtractedThinkingSegment> = [{ type: 'text', content: text }];
 
   for (const pattern of taggedThinkingPatterns) {
