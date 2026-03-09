@@ -1,12 +1,16 @@
 /**
- * Keep RunPod serverless workers warm by sending a lightweight ping every 5 minutes.
- * Without this, workers go idle between requests and cold-start takes 10-20 seconds.
+ * Keep RunPod workers warm by sending a lightweight ping every 5 minutes.
+ * Only active during Brazilian peak hours (07:00–23:00 BRT = 10:00–02:00 UTC).
+ * Without this, cold starts take 3–5 minutes.
  */
 const axios = require('axios');
 const { logger } = require('@librechat/data-schemas');
 
 const PING_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 const PING_TIMEOUT_MS = 30_000;
+// BRT = UTC-3. Peak hours: 07:00–23:00 BRT → 10:00–02:00 UTC (next day)
+const PEAK_START_UTC = 10; // 07:00 BRT
+const PEAK_END_UTC = 2;    // 23:00 BRT (wraps past midnight)
 
 function isRunpodServerless(baseURL) {
   return typeof baseURL === 'string' && baseURL.includes('api.runpod.ai/v2/');
@@ -15,6 +19,12 @@ function isRunpodServerless(baseURL) {
 function extractEndpointId(baseURL) {
   const match = baseURL.match(/api\.runpod\.ai\/v2\/([^/]+)/);
   return match ? match[1] : null;
+}
+
+function isBrazilianPeakHour() {
+  const hourUtc = new Date().getUTCHours();
+  // Peak: 10:00–23:59 UTC (07:00–20:59 BRT) AND 00:00–02:00 UTC (21:00–23:00 BRT)
+  return hourUtc >= PEAK_START_UTC || hourUtc < PEAK_END_UTC;
 }
 
 async function pingRunpod(endpointId, apiKey) {
@@ -55,9 +65,13 @@ function startKeepWarm() {
     return;
   }
 
-  logger.info(`[RunpodKeepWarm] Starting keep-warm pings every ${PING_INTERVAL_MS / 60000} min for endpoint ${endpointId}`);
+  logger.info(`[RunpodKeepWarm] Starting keep-warm pings every ${PING_INTERVAL_MS / 60000} min for endpoint ${endpointId} (BR peak hours only: 07–23h BRT)`);
 
   const run = () => {
+    if (!isBrazilianPeakHour()) {
+      logger.debug('[RunpodKeepWarm] Outside BR peak hours, skipping ping');
+      return;
+    }
     pingRunpod(endpointId, apiKey).catch((err) => {
       logger.warn(`[RunpodKeepWarm] ping failed: ${err.message}`);
     });
