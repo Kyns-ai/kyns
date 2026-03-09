@@ -119,10 +119,6 @@ class KynsImageGen extends Tool {
     this.returnMetadata = fields.returnMetadata ?? false;
     this.isAgent = fields.isAgent;
 
-    if (this.isAgent) {
-      throw new Error('KynsImageGen is not available for agent endpoints.');
-    }
-
     if (fields.uploadImageBuffer) {
       this.uploadImageBuffer = fields.uploadImageBuffer.bind(this);
     }

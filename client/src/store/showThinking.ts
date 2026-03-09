@@ -1,6 +1,6 @@
 import { createStorageAtom } from './jotai-utils';
 
-const DEFAULT_SHOW_THINKING = false;
+const DEFAULT_SHOW_THINKING = true;
 
 /**
  * This atom controls whether AI reasoning/thinking content is expanded by default.
