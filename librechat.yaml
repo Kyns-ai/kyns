@@ -40,6 +40,8 @@ rateLimits:
     ipWindowInMinutes: 1440
     userMax: 10
     userWindowInMinutes: 1440
+transactions:
+  enabled: true
 balance:
   enabled: true
   startBalance: 100000
