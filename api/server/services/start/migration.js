@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
+const sharp = require('sharp');
 const { logger } = require('@librechat/data-schemas');
 const { ensureRequiredCollectionsExist } = require('@librechat/api');
 const { AccessRoleIds, ResourceType, PrincipalType, Constants } = require('librechat-data-provider');
@@ -111,6 +112,25 @@ async function runAgentPermissionsMigration() {
   return results;
 }
 
+function avatarColorForName(name) {
+  const colors = ['#E91E8C','#9C27B0','#3F51B5','#2196F3','#009688','#FF5722','#795548','#607D8B'];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+  return colors[Math.abs(h) % colors.length];
+}
+
+async function generateAvatarPlaceholder(name, outputPath) {
+  const color = avatarColorForName(name);
+  const initial = (name || '?')[0].toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
+    <circle cx="128" cy="128" r="128" fill="${color}"/>
+    <text x="128" y="128" dy="0.35em" text-anchor="middle" font-family="Arial,sans-serif"
+      font-size="120" font-weight="bold" fill="rgba(255,255,255,0.95)">${initial}</text>
+  </svg>`;
+  await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
+  await sharp(Buffer.from(svg)).png().toFile(outputPath);
+}
+
 async function logAgentAvatarDiagnostics() {
   try {
     const db = mongoose.connection.db;
@@ -122,28 +142,29 @@ async function logAgentAvatarDiagnostics() {
     ).toArray();
 
     const imagesBase = path.resolve(__dirname, '..', '..', '..', '..', 'client', 'public', 'images');
-    logger.info(`[AvatarDiag] Images directory: ${imagesBase}`);
-    logger.info(`[AvatarDiag] Total agents: ${agents.length}`);
+    let restored = 0;
 
     for (const agent of agents) {
       const av = agent.avatar;
-      if (!av || !av.filepath) {
-        logger.info(`[AvatarDiag] ${agent.name}: NO_AVATAR (source=none)`);
-        continue;
-      }
+      if (!av || !av.filepath || av.source !== 'local') continue;
 
-      const source = av.source || 'unknown';
-      const fp = av.filepath;
+      const urlPath = av.filepath.split('?')[0];
+      const relPath = urlPath.startsWith('/images/') ? urlPath.slice('/images/'.length) : urlPath;
+      const absPath = path.join(imagesBase, relPath);
 
-      if (source === 'local') {
-        const urlPath = fp.split('?')[0];
-        const relPath = urlPath.startsWith('/images/') ? urlPath.slice('/images/'.length) : urlPath;
-        const absPath = path.join(imagesBase, relPath);
-        const exists = fs.existsSync(absPath);
-        logger.info(`[AvatarDiag] ${agent.name}: source=${source} exists=${exists} path=${relPath}`);
-      } else {
-        logger.info(`[AvatarDiag] ${agent.name}: source=${source} filepath=${fp.substring(0, 80)}`);
+      if (!fs.existsSync(absPath)) {
+        try {
+          await generateAvatarPlaceholder(agent.name, absPath);
+          restored++;
+          logger.info(`[AvatarRestore] Generated placeholder for "${agent.name}"`);
+        } catch (e) {
+          logger.error(`[AvatarRestore] Failed to generate avatar for "${agent.name}": ${e.message}`);
+        }
       }
+    }
+
+    if (restored > 0) {
+      logger.info(`[AvatarRestore] Restored ${restored} placeholder avatar(s)`);
     }
   } catch (e) {
     logger.error('[AvatarDiag] Error running diagnostics:', e.message);
