@@ -177,3 +177,4 @@ hive-mind-prompt-*.txt
 # Allow analytics admin logs route
 !analytics/src/app/api/admin/logs/
 !analytics/src/app/api/admin/logs/route.ts
+.kyns-session.json
