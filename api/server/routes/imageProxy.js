@@ -9,7 +9,7 @@ const paths = require('~/config/paths');
 
 const PROXY_API_KEY = process.env.IMAGE_PROXY_KEY || 'kyns-image-internal';
 const POLL_INTERVAL_MS = 3000;
-const POLL_TIMEOUT_MS = 150_000;
+const POLL_TIMEOUT_MS = 300_000;
 const WATERMARK_TEXT = 'kyns.ai';
 
 const router = express.Router();
@@ -45,15 +45,26 @@ async function addWatermark(buffer) {
 
 async function pollRunpodJob(endpointId, jobId, apiKey) {
   const statusUrl = `https://api.runpod.ai/v2/${endpointId}/status/${jobId}`;
+  const cancelUrl = `https://api.runpod.ai/v2/${endpointId}/cancel/${jobId}`;
   const start = Date.now();
+  let inQueueCount = 0;
   while (Date.now() - start < POLL_TIMEOUT_MS) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     const resp = await axios.get(statusUrl, { headers: { Authorization: `Bearer ${apiKey}` } });
     const { status, output, error } = resp.data;
     if (status === 'COMPLETED') return output;
     if (status === 'FAILED' || error) throw new Error(`RunPod job failed: ${error || 'unknown'}`);
+    if (status === 'CANCELLED') throw new Error('Geração cancelada.');
+    if (status === 'IN_QUEUE') {
+      inQueueCount++;
+      if (inQueueCount >= 10) {
+        await axios.post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` } }).catch(() => {});
+        throw new Error('Sem GPU disponível agora. O servidor de imagem está offline ou sobrecarregado. Tente novamente em alguns minutos.');
+      }
+    }
   }
-  throw new Error('Image generation timed out after 150 seconds.');
+  await axios.post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` } }).catch(() => {});
+  throw new Error('Timeout: geração de imagem demorou mais de 5 minutos.');
 }
 
 function parseImageRequest(messages, requestedModel) {
