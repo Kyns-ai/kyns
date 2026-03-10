@@ -1,12 +1,11 @@
 import { useMemo, memo, type FC, useCallback, useEffect, useRef } from 'react';
 import throttle from 'lodash/throttle';
-import { ChevronDown } from 'lucide-react';
 import { useRecoilValue } from 'recoil';
 import { Spinner, useMediaQuery } from '@librechat/client';
 import { List, AutoSizer, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import { isAgentsEndpoint } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
-import { useLocalize, TranslationKeys, useFavorites, useShowMarketplace } from '~/hooks';
+import { useLocalize, TranslationKeys, useFavorites, useShowMarketplace, useLocalStorage } from '~/hooks';
 import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
 import { useActiveJobs } from '~/data-provider';
 import { groupConversationsByDate, cn } from '~/utils';
@@ -31,8 +30,6 @@ interface ConversationsProps {
   loadMoreConversations: () => void;
   isLoading: boolean;
   isSearchLoading: boolean;
-  isChatsExpanded: boolean;
-  setIsChatsExpanded: (expanded: boolean) => void;
 }
 
 interface MeasuredRowProps {
@@ -72,43 +69,46 @@ const LoadingSpinner = memo(() => {
 
 LoadingSpinner.displayName = 'LoadingSpinner';
 
-interface ChatsHeaderProps {
-  isExpanded: boolean;
-  onToggle: () => void;
+type ActiveTab = 'chats' | 'characters';
+
+interface TabBarProps {
+  activeTab: ActiveTab;
+  onTabChange: (tab: ActiveTab) => void;
 }
 
-/** Collapsible header for the Chats section */
-const ChatsHeader: FC<ChatsHeaderProps> = memo(({ isExpanded, onToggle }) => {
+const TabBar: FC<TabBarProps> = memo(({ activeTab, onTabChange }) => {
   const localize = useLocalize();
   return (
-    <button
-      onClick={onToggle}
-      className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-xs font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
-      type="button"
-    >
-      <span className="select-none">{localize('com_ui_chats')}</span>
-      <ChevronDown
-        className={cn('h-3 w-3 transition-transform duration-200', isExpanded ? 'rotate-180' : '')}
-      />
-    </button>
-  );
-});
-
-ChatsHeader.displayName = 'ChatsHeader';
-
-const SectionHeader: FC<{ labelKey: string }> = memo(({ labelKey }) => {
-  const localize = useLocalize();
-  return (
-    <div className="flex items-center gap-2 px-1 pb-1 pt-3">
-      <span className="text-xs font-bold text-text-secondary select-none">
-        {localize(labelKey as TranslationKeys) || labelKey}
-      </span>
-      <div className="h-px flex-1 bg-border-light opacity-60" />
+    <div className="flex gap-1 px-1 py-1.5">
+      <button
+        type="button"
+        onClick={() => onTabChange('chats')}
+        className={cn(
+          'flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition-colors',
+          activeTab === 'chats'
+            ? 'bg-surface-active-alt text-text-primary'
+            : 'text-text-secondary hover:bg-surface-active-alt hover:text-text-primary',
+        )}
+      >
+        {localize('com_ui_chats')}
+      </button>
+      <button
+        type="button"
+        onClick={() => onTabChange('characters')}
+        className={cn(
+          'flex-1 rounded-md px-2 py-1.5 text-xs font-semibold transition-colors',
+          activeTab === 'characters'
+            ? 'bg-surface-active-alt text-text-primary'
+            : 'text-text-secondary hover:bg-surface-active-alt hover:text-text-primary',
+        )}
+      >
+        {localize('com_agents_marketplace')}
+      </button>
     </div>
   );
 });
 
-SectionHeader.displayName = 'SectionHeader';
+TabBar.displayName = 'TabBar';
 
 const DateLabel: FC<{ groupName: string; isFirst?: boolean }> = memo(({ groupName, isFirst }) => {
   const localize = useLocalize();
@@ -126,8 +126,7 @@ DateLabel.displayName = 'DateLabel';
 
 type FlattenedItem =
   | { type: 'favorites' }
-  | { type: 'chats-header' }
-  | { type: 'characters-header' }
+  | { type: 'tab-bar' }
   | { type: 'header'; groupName: string; section: 'chats' | 'characters' }
   | { type: 'convo'; convo: TConversation }
   | { type: 'loading' };
@@ -171,8 +170,6 @@ const Conversations: FC<ConversationsProps> = ({
   loadMoreConversations,
   isLoading,
   isSearchLoading,
-  isChatsExpanded,
-  setIsChatsExpanded,
 }) => {
   const localize = useLocalize();
   const search = useRecoilValue(store.search);
@@ -180,26 +177,20 @@ const Conversations: FC<ConversationsProps> = ({
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const convoHeight = isSmallScreen ? 44 : 34;
   const showAgentMarketplace = useShowMarketplace();
+  const [activeTab, setActiveTab] = useLocalStorage<ActiveTab>('convoActiveTab', 'chats');
 
-  // Fetch active job IDs for showing generation indicators
   const { data: activeJobsData } = useActiveJobs();
   const activeJobIds = useMemo(
     () => new Set(activeJobsData?.activeJobIds ?? []),
     [activeJobsData?.activeJobIds],
   );
 
-  // Determine if FavoritesList will render content
   const shouldShowFavorites =
     !search.query && (isFavoritesLoading || favorites.length > 0 || showAgentMarketplace);
 
   const filteredConversations = useMemo(
     () => rawConversations.filter(Boolean) as TConversation[],
     [rawConversations],
-  );
-
-  const groupedConversations = useMemo(
-    () => groupConversationsByDate(filteredConversations),
-    [filteredConversations],
   );
 
   const { agentConversations, chatConversations } = useMemo(() => {
@@ -230,44 +221,35 @@ const Conversations: FC<ConversationsProps> = ({
     if (shouldShowFavorites) {
       items.push({ type: 'favorites' });
     }
-    items.push({ type: 'chats-header' });
+    items.push({ type: 'tab-bar' });
 
-    if (isChatsExpanded) {
-      if (agentConversations.length > 0) {
-        items.push({ type: 'characters-header' });
-        groupedAgentConversations.forEach(([groupName, convos]) => {
-          items.push({ type: 'header', groupName, section: 'characters' });
-          items.push(...convos.map((convo) => ({ type: 'convo' as const, convo })));
-        });
-      }
+    const activeGroups =
+      activeTab === 'characters' ? groupedAgentConversations : groupedChatConversations;
 
-      if (chatConversations.length > 0) {
-        groupedChatConversations.forEach(([groupName, convos]) => {
-          items.push({ type: 'header', groupName, section: 'chats' });
-          items.push(...convos.map((convo) => ({ type: 'convo' as const, convo })));
-        });
-      }
+    activeGroups.forEach(([groupName, convos]) => {
+      items.push({
+        type: 'header',
+        groupName,
+        section: activeTab === 'characters' ? 'characters' : 'chats',
+      });
+      items.push(...convos.map((convo) => ({ type: 'convo' as const, convo })));
+    });
 
-      if (isLoading) {
-        items.push({ type: 'loading' } as any);
-      }
+    if (isLoading) {
+      items.push({ type: 'loading' });
     }
     return items;
   }, [
-    agentConversations,
-    chatConversations,
     groupedAgentConversations,
     groupedChatConversations,
     isLoading,
-    isChatsExpanded,
+    activeTab,
     shouldShowFavorites,
   ]);
 
-  // Store flattenedItems in a ref for keyMapper to access without recreating cache
   const flattenedItemsRef = useRef(flattenedItems);
   flattenedItemsRef.current = flattenedItems;
 
-  // Create a stable cache that doesn't depend on flattenedItems
   const cache = useMemo(
     () =>
       new CellMeasurerCache({
@@ -281,11 +263,8 @@ const Conversations: FC<ConversationsProps> = ({
           if (item.type === 'favorites') {
             return 'favorites';
           }
-          if (item.type === 'chats-header') {
-            return 'chats-header';
-          }
-          if (item.type === 'characters-header') {
-            return 'characters-header';
+          if (item.type === 'tab-bar') {
+            return 'tab-bar';
           }
           if (item.type === 'header') {
             return `header-${item.section}-${item.groupName}`;
@@ -302,7 +281,6 @@ const Conversations: FC<ConversationsProps> = ({
     [convoHeight],
   );
 
-  // Debounced function to clear cache and recompute heights
   const clearFavoritesCache = useCallback(() => {
     if (cache) {
       cache.clear(0, 0);
@@ -312,13 +290,19 @@ const Conversations: FC<ConversationsProps> = ({
     }
   }, [cache, containerRef]);
 
-  // Clear cache when favorites change
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
       clearFavoritesCache();
     });
     return () => cancelAnimationFrame(frameId);
   }, [favorites.length, isFavoritesLoading, clearFavoritesCache]);
+
+  useEffect(() => {
+    cache.clearAll();
+    if (containerRef.current && 'recomputeRowHeights' in containerRef.current) {
+      (containerRef.current as unknown as { recomputeRowHeights: (idx: number) => void }).recomputeRowHeights(0);
+    }
+  }, [activeTab, cache, containerRef]);
 
   const rowRenderer = useCallback(
     ({ index, key, parent, style }) => {
@@ -345,21 +329,10 @@ const Conversations: FC<ConversationsProps> = ({
         );
       }
 
-      if (item.type === 'chats-header') {
+      if (item.type === 'tab-bar') {
         return (
           <MeasuredRow key={key} {...rowProps}>
-            <ChatsHeader
-              isExpanded={isChatsExpanded}
-              onToggle={() => setIsChatsExpanded(!isChatsExpanded)}
-            />
-          </MeasuredRow>
-        );
-      }
-
-      if (item.type === 'characters-header') {
-        return (
-          <MeasuredRow key={key} {...rowProps}>
-            <SectionHeader labelKey="com_agents_marketplace" />
+            <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
           </MeasuredRow>
         );
       }
@@ -396,8 +369,8 @@ const Conversations: FC<ConversationsProps> = ({
       toggleNav,
       clearFavoritesCache,
       isSmallScreen,
-      isChatsExpanded,
-      setIsChatsExpanded,
+      activeTab,
+      setActiveTab,
       shouldShowFavorites,
       activeJobIds,
     ],

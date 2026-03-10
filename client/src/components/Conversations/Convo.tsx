@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useParams } from 'react-router-dom';
-import { Constants } from 'librechat-data-provider';
+import { isAgentsEndpoint, Constants } from 'librechat-data-provider';
 import { useToastContext, useMediaQuery } from '@librechat/client';
 import type { TConversation } from 'librechat-data-provider';
 import { useUpdateConversationMutation } from '~/data-provider';
@@ -42,6 +42,14 @@ export default function Conversation({
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const isShiftHeld = useShiftKey();
   const { conversationId, title = '' } = conversation;
+
+  const displayTitle = useMemo(() => {
+    if (!isAgentsEndpoint(conversation.endpoint)) return title || '';
+    if (title && title !== 'New Chat') return title;
+    const agent = conversation.agent_id ? agentsMap?.[conversation.agent_id] : null;
+    return agent?.name ?? title ?? '';
+  }, [conversation.endpoint, conversation.agent_id, title, agentsMap]);
+
 
   const [titleInput, setTitleInput] = useState(title || '');
   const [renaming, setRenaming] = useState(false);
@@ -159,8 +167,8 @@ export default function Conversation({
 
     toggleNav();
 
-    if (typeof title === 'string' && title.length > 0) {
-      document.title = title;
+    if (typeof displayTitle === 'string' && displayTitle.length > 0) {
+      document.title = displayTitle;
     }
 
     navigateToConvo(conversation, {
@@ -192,7 +200,7 @@ export default function Conversation({
       role="button"
       tabIndex={renaming ? -1 : 0}
       aria-label={localize('com_ui_conversation_label', {
-        title: title || localize('com_ui_untitled'),
+        title: displayTitle || localize('com_ui_untitled'),
       })}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -233,7 +241,7 @@ export default function Conversation({
         <ConvoLink
           isActiveConvo={isActiveConvo}
           isPopoverActive={isPopoverActive}
-          title={title}
+          title={displayTitle}
           onRename={handleRename}
           isSmallScreen={isSmallScreen}
           localize={localize}
