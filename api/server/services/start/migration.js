@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
-const sharp = require('sharp');
 const { logger } = require('@librechat/data-schemas');
 const { ensureRequiredCollectionsExist } = require('@librechat/api');
 const { AccessRoleIds, ResourceType, PrincipalType, Constants } = require('librechat-data-provider');
@@ -113,61 +112,71 @@ async function runAgentPermissionsMigration() {
 }
 
 function avatarColorForName(name) {
-  const colors = ['#E91E8C','#9C27B0','#3F51B5','#2196F3','#009688','#FF5722','#795548','#607D8B'];
+  const colors = ['#E91E8C', '#9C27B0', '#3F51B5', '#2196F3', '#009688', '#FF5722', '#795548', '#607D8B'];
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
   return colors[Math.abs(h) % colors.length];
 }
 
-async function generateAvatarPlaceholder(name, outputPath) {
+/** Generates a stable inline SVG data URI avatar (circle + initial letter). Stored directly in MongoDB — never lost on redeploy. */
+function generateSvgDataUri(name) {
   const color = avatarColorForName(name);
   const initial = (name || '?')[0].toUpperCase();
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256">
-    <circle cx="128" cy="128" r="128" fill="${color}"/>
-    <text x="128" y="128" dy="0.35em" text-anchor="middle" font-family="Arial,sans-serif"
-      font-size="120" font-weight="bold" fill="rgba(255,255,255,0.95)">${initial}</text>
-  </svg>`;
-  await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
-  await sharp(Buffer.from(svg)).png().toFile(outputPath);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="20" fill="${color}"/><text x="20" y="20" dy="0.35em" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="rgba(255,255,255,0.95)">${initial}</text></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 }
 
-async function logAgentAvatarDiagnostics() {
+/**
+ * For each agent whose local avatar file is missing from disk, updates MongoDB
+ * to store a self-contained SVG data URI instead. The data URI lives in the DB
+ * (persistent Railway volume) and can never disappear due to container rebuilds.
+ */
+async function fixMissingAgentAvatars() {
   try {
     const db = mongoose.connection.db;
     if (!db) return;
 
-    const agents = await db.collection('agents').find(
-      {},
-      { projection: { name: 1, id: 1, avatar: 1, author: 1 } }
-    ).toArray();
+    const agents = await db
+      .collection('agents')
+      .find({}, { projection: { name: 1, id: 1, avatar: 1 } })
+      .toArray();
 
     const imagesBase = path.resolve(__dirname, '..', '..', '..', '..', 'client', 'public', 'images');
-    let restored = 0;
+    let fixed = 0;
 
     for (const agent of agents) {
       const av = agent.avatar;
-      if (!av || !av.filepath || av.source !== 'local') continue;
+      if (!av || !av.filepath) continue;
 
-      const urlPath = av.filepath.split('?')[0];
-      const relPath = urlPath.startsWith('/images/') ? urlPath.slice('/images/'.length) : urlPath;
-      const absPath = path.join(imagesBase, relPath);
+      // Already a data URI or external URL — nothing to do
+      if (av.filepath.startsWith('data:') || av.filepath.startsWith('http')) continue;
 
-      if (!fs.existsSync(absPath)) {
-        try {
-          await generateAvatarPlaceholder(agent.name, absPath);
-          restored++;
-          logger.info(`[AvatarRestore] Generated placeholder for "${agent.name}"`);
-        } catch (e) {
-          logger.error(`[AvatarRestore] Failed to generate avatar for "${agent.name}": ${e.message}`);
+      // Local file path: check whether the file actually exists on disk
+      if (av.source === 'local' && av.filepath.startsWith('/images/')) {
+        const relPath = av.filepath.split('?')[0].slice('/images/'.length);
+        const absPath = path.join(imagesBase, relPath);
+
+        if (!fs.existsSync(absPath)) {
+          try {
+            const dataUri = generateSvgDataUri(agent.name);
+            await db.collection('agents').updateOne(
+              { _id: agent._id },
+              { $set: { avatar: { filepath: dataUri, source: 'local' } } },
+            );
+            fixed++;
+            logger.info(`[AvatarFix] Stored persistent data-URI avatar for "${agent.name}"`);
+          } catch (e) {
+            logger.error(`[AvatarFix] Failed for "${agent.name}": ${e.message}`);
+          }
         }
       }
     }
 
-    if (restored > 0) {
-      logger.info(`[AvatarRestore] Restored ${restored} placeholder avatar(s)`);
+    if (fixed > 0) {
+      logger.info(`[AvatarFix] ${fixed} agent avatar(s) updated to persistent data URIs`);
     }
   } catch (e) {
-    logger.error('[AvatarDiag] Error running diagnostics:', e.message);
+    logger.error('[AvatarFix] Error:', e.message);
   }
 }
 
@@ -274,5 +283,5 @@ async function checkMigrations() {
 
 module.exports = {
   checkMigrations,
-  logAgentAvatarDiagnostics,
+  fixMissingAgentAvatars,
 };
