@@ -1,0 +1,16 @@
+# Railway-specific ignore - similar to .gitignore but explicitly includes librechat.yaml
+**/.circleci
+**/.editorconfig
+**/.DS_Store
+**/.vscode
+**/node_modules
+data-node
+meili_data*
+librechat.yaml.bak*
+docs
+coverage
+**/__tests__
+**/*.test.ts
+**/*.spec.ts
+**/*.test.js
+**/*.spec.js
