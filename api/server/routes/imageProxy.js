@@ -56,22 +56,27 @@ async function pollRunpodJob(endpointId, jobId, apiKey) {
   throw new Error('Image generation timed out after 150 seconds.');
 }
 
-function parseImageRequest(messages) {
+function parseImageRequest(messages, requestedModel) {
   const lastUser = [...(messages || [])].reverse().find((m) => m.role === 'user');
   const content = typeof lastUser?.content === 'string' ? lastUser.content : '';
   const isPortrait = /portrait|vertical|tall/i.test(content);
   const isLandscape = /landscape|horizontal|wide/i.test(content);
-  const useFast = /zimage|fast|rápido|rapido|quick/i.test(content);
+
+  // requestedModel from the model spec takes precedence; fall back to keyword detection
+  const validModels = new Set(['lustify', 'zimage']);
+  const model = validModels.has(requestedModel) ? requestedModel
+    : /zimage|fast|rápido|rapido|quick/i.test(content) ? 'zimage'
+    : 'lustify';
 
   const width = Math.round((isLandscape ? 1792 : 1024) / 8) * 8;
   const height = Math.round((isPortrait ? 1792 : 1024) / 8) * 8;
 
   return {
     prompt: content,
-    model: useFast ? 'zimage' : 'lustify',
+    model,
     width,
     height,
-    steps: useFast ? 8 : 30,
+    steps: model === 'zimage' ? 8 : 30,
     cfg_scale: 7,
     negative_prompt: 'lowres, blurry, bad anatomy, worst quality, low quality',
   };
@@ -102,7 +107,7 @@ router.post('/v1/chat/completions', async (req, res) => {
     return res.json(makeResponse('Geração de imagens não configurada. Contate o administrador.'));
   }
 
-  const params = parseImageRequest(req.body.messages);
+  const params = parseImageRequest(req.body.messages, req.body.model);
 
   if (!params.prompt || params.prompt.trim().length < 3) {
     return res.json(makeResponse('Por favor, descreva a imagem que deseja gerar.'));

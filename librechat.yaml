@@ -166,17 +166,30 @@ modelSpecs:
           - Nunca repita frases, palavras ou blocos de texto. Quando completar a resposta, pare imediatamente.
           - A resposta deve sempre estar em português brasileiro fluente.
 
-    - name: "kyns-image"
+
+    - name: "kyns-image-lustify"
       label: "KYNS Image"
-      description: "Gera imagens com IA. Lustify v7 (fotorrealista, NSFW) ou Z-Image Turbo (rápido). Limite: 10/dia."
+      description: "Lustify v7 — fotorrealista, detalhado, NSFW. Alta qualidade. ~60s por imagem. Limite: 10/dia."
       iconURL: "https://raw.githubusercontent.com/Kyns-ai/config/main/files/kyns-favicon-32.png"
       showIconInHeader: true
       showIconInMenu: true
       preset:
         endpoint: "KYNSImage"
-        model: "kyns-image"
+        model: "lustify"
         modelLabel: "KYNS Image"
-        greeting: "Descreva a imagem que quer criar. Ex: \"mulher na praia ao pôr do sol, fotorrealista\""
+        greeting: "KYNS Image — Lustify v7. Fotorrealista, alta qualidade, NSFW. ~60 segundos. Descreva a imagem:"
+    - name: "kyns-image-turbo"
+      label: "KYNS Image Turbo"
+      description: "Z-Image Turbo — geração rápida em ~15s. Ótimo para testes e variações rápidas."
+      iconURL: "https://raw.githubusercontent.com/Kyns-ai/config/main/files/kyns-favicon-32.png"
+      showIconInHeader: true
+      showIconInMenu: true
+      preset:
+        endpoint: "KYNSImage"
+        model: "zimage"
+        modelLabel: "KYNS Image Turbo"
+        greeting: "KYNS Image Turbo — Z-Image Turbo. Rápido (~15s), ideal para protótipos. Para NSFW fotorrealista use KYNS Image. Descreva a imagem:"
+
 
 endpoints:
   openAI:
