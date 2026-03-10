@@ -1,0 +1,34 @@
+name: Make kyns-image-worker package public
+
+on:
+  workflow_dispatch:
+
+jobs:
+  make-public:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Make package public (org)
+        run: |
+          echo "Attempting to make package public..."
+          RESPONSE=$(gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            "/orgs/${{ github.repository_owner }}/packages/container/kyns-image-worker" \
+            -f visibility=public 2>&1)
+          echo "Response: $RESPONSE"
+          echo "Exit code: $?"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify visibility
+        run: |
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/orgs/${{ github.repository_owner }}/packages/container/kyns-image-worker" \
+            --jq '.visibility' 2>&1 || echo "Could not query package visibility"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
