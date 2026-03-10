@@ -82,7 +82,7 @@ async function pollRunpodJob(endpointId, jobId, apiKey) {
 }
 
 function parseImageRequest(messages, requestedModel) {
-  const lastUser = [...(messages || [])].reverse().find((m) => m.role === 'user');
+  const lastUser = [...(messages || [])].filter(Boolean).reverse().find((m) => m.role === 'user');
   const content = typeof lastUser?.content === 'string' ? lastUser.content : '';
   const isPortrait = /portrait|vertical|tall/i.test(content);
   const isLandscape = /landscape|horizontal|wide/i.test(content);
@@ -119,6 +119,7 @@ function makeResponse(content) {
 }
 
 async function imageRequestHandler(req, res) {
+  try {
   const authHeader = req.headers.authorization || '';
   if (!authHeader.includes(PROXY_API_KEY)) {
     return res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_error' } });
@@ -193,6 +194,10 @@ async function imageRequestHandler(req, res) {
   const content = `![Imagem gerada](${imageUrl})\n\n_Gerada por KYNS Image · ${modelLabel} · ${params.width}×${params.height}px_`;
 
   return res.json(makeResponse(content));
+  } catch (err) {
+    logger.error('[imageProxy] Unhandled error:', err.message);
+    return res.json(makeResponse('Erro inesperado na geração de imagem. Tente novamente.'));
+  }
 }
 
 router.post('/chat/completions', imageRequestHandler);

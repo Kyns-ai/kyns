@@ -1,8 +1,19 @@
 """
 RunPod Serverless handler for KYNS image generation.
 
-Models loaded from network volume on startup.
-If not present, downloads from CivitAI or a direct URL.
+Models are loaded from HuggingFace Hub (preferred) or from a direct URL.
+If a network volume is attached, models are cached there across restarts.
+
+Primary models (HuggingFace Hub, no auth needed):
+  - lustify: RunDiffusion/Juggernaut-XL-v9  (photorealistic, NSFW-capable)
+  - zimage:  stabilityai/sdxl-turbo          (fast, 4 steps)
+
+Override with env vars:
+  LUSTIFY_HF_MODEL  (default: RunDiffusion/Juggernaut-XL-v9)
+  ZIMAGE_HF_MODEL   (default: stabilityai/sdxl-turbo)
+  LUSTIFY_MODEL_URL / ZIMAGE_MODEL_URL  (direct .safetensors URL as fallback)
+  CIVITAI_TOKEN     (for CivitAI download auth, used when URL contains civitai.com)
+  HF_TOKEN          (HuggingFace token for gated models)
 
 Input:
   {
@@ -25,42 +36,50 @@ import urllib.request
 
 import torch
 import runpod
-from diffusers import StableDiffusionXLPipeline
+from diffusers import StableDiffusionXLPipeline, AutoPipelineForText2Image
 from PIL import Image
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("kyns-image")
 
-VOLUME_PATH    = os.getenv("VOLUME_PATH",    "/runpod-volume")
-LUSTIFY_MODEL  = os.getenv("LUSTIFY_MODEL",  "lustifySDXLNSFW_ggwpV7.safetensors")
-ZIMAGE_MODEL   = os.getenv("ZIMAGE_MODEL",   "zImageTurbo_v1.safetensors")
-CIVITAI_TOKEN  = os.getenv("CIVITAI_TOKEN",  "")
+VOLUME_PATH = os.getenv("VOLUME_PATH", "/runpod-volume")
+HF_TOKEN = os.getenv("HF_TOKEN", "")
+CIVITAI_TOKEN = os.getenv("CIVITAI_TOKEN", "")
 
-# Set these env vars in the RunPod endpoint to auto-download models if missing:
-# LUSTIFY_MODEL_URL=https://civitai.com/api/download/models/XXXXX
-# ZIMAGE_MODEL_URL=https://civitai.com/api/download/models/YYYYY
+LUSTIFY_HF_MODEL = os.getenv("LUSTIFY_HF_MODEL", "RunDiffusion/Juggernaut-XL-v9")
+ZIMAGE_HF_MODEL  = os.getenv("ZIMAGE_HF_MODEL",  "stabilityai/sdxl-turbo")
+
 LUSTIFY_MODEL_URL = os.getenv("LUSTIFY_MODEL_URL", "")
 ZIMAGE_MODEL_URL  = os.getenv("ZIMAGE_MODEL_URL",  "")
+
+# Legacy safetensors filenames (used only when MODEL_URL is a direct file URL)
+LUSTIFY_MODEL = os.getenv("LUSTIFY_MODEL", "lustify_model.safetensors")
+ZIMAGE_MODEL  = os.getenv("ZIMAGE_MODEL",  "zimage_model.safetensors")
 
 pipes: dict = {}
 
 
-def _download(url: str, dest: str) -> bool:
+def _download_url(url: str, dest: str) -> bool:
     if not url:
         return False
+    resolved_url = url
     if CIVITAI_TOKEN and "civitai.com" in url:
         sep = "&" if "?" in url else "?"
-        url = f"{url}{sep}token={CIVITAI_TOKEN}"
-    logger.info("Downloading model from %s → %s ...", url.split("?")[0], dest)
+        resolved_url = f"{url}{sep}token={CIVITAI_TOKEN}"
+    logger.info("Downloading from %s → %s ...", resolved_url.split("?")[0], dest)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "kyns-image-worker/1.0"})
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; kyns-image-worker/2.0)"}
+        if HF_TOKEN and "huggingface.co" in resolved_url:
+            headers["Authorization"] = f"Bearer {HF_TOKEN}"
+        req = urllib.request.Request(resolved_url, headers=headers)
         with urllib.request.urlopen(req, timeout=1800) as resp, open(dest, "wb") as f:
             downloaded = 0
             while chunk := resp.read(8 * 1024 * 1024):
                 f.write(chunk)
                 downloaded += len(chunk)
-                logger.info("  Downloaded %.1f MB ...", downloaded / 1e6)
+                if downloaded % (500 * 1024 * 1024) < 8 * 1024 * 1024:
+                    logger.info("  Downloaded %.1f MB ...", downloaded / 1e6)
         logger.info("Download complete: %.1f MB", os.path.getsize(dest) / 1e6)
         return True
     except Exception as e:
@@ -70,24 +89,45 @@ def _download(url: str, dest: str) -> bool:
         return False
 
 
-def load_pipe(model_key: str, filename: str, download_url: str) -> object | None:
+def _load_from_hf(model_key: str, hf_model_id: str) -> "StableDiffusionXLPipeline | None":
+    cache_dir = os.path.join(VOLUME_PATH, "hf-cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    logger.info("Loading %s from HuggingFace: %s (cache: %s)", model_key, hf_model_id, cache_dir)
+    try:
+        kwargs = {
+            "torch_dtype": torch.float16,
+            "use_safetensors": True,
+            "cache_dir": cache_dir,
+            "variant": "fp16",
+        }
+        if HF_TOKEN:
+            kwargs["token"] = HF_TOKEN
+        try:
+            pipe = AutoPipelineForText2Image.from_pretrained(hf_model_id, **kwargs)
+        except Exception:
+            del kwargs["variant"]
+            pipe = AutoPipelineForText2Image.from_pretrained(hf_model_id, **kwargs)
+        pipe = pipe.to("cuda")
+        try:
+            pipe.enable_xformers_memory_efficient_attention()
+        except Exception:
+            pass
+        logger.info("Model %s loaded from HuggingFace successfully.", model_key)
+        return pipe
+    except Exception as e:
+        logger.error("Failed to load %s from HuggingFace: %s", model_key, e)
+        return None
+
+
+def _load_from_file(model_key: str, filename: str, download_url: str) -> "StableDiffusionXLPipeline | None":
     path = os.path.join(VOLUME_PATH, filename)
-
     if not os.path.exists(path):
-        logger.warning("Model not found: %s", path)
-        if download_url:
-            ok = _download(download_url, path)
-            if not ok:
-                logger.error("Could not download %s — set %s_MODEL_URL in endpoint env vars.", filename, model_key.upper())
-                return None
-        else:
-            logger.error(
-                "Model %s missing. Set %s_MODEL_URL in RunPod endpoint env vars to auto-download.",
-                filename, model_key.upper()
-            )
+        logger.warning("Model file not found: %s", path)
+        if not download_url:
             return None
-
-    logger.info("Loading model %s from %s ...", model_key, path)
+        if not _download_url(download_url, path):
+            return None
+    logger.info("Loading %s from file: %s", model_key, path)
     try:
         pipe = StableDiffusionXLPipeline.from_single_file(
             path,
@@ -95,28 +135,48 @@ def load_pipe(model_key: str, filename: str, download_url: str) -> object | None
             use_safetensors=True,
         )
         pipe = pipe.to("cuda")
-        pipe.enable_xformers_memory_efficient_attention()
-        logger.info("Model %s loaded successfully.", model_key)
+        try:
+            pipe.enable_xformers_memory_efficient_attention()
+        except Exception:
+            pass
+        logger.info("Model %s loaded from file successfully.", model_key)
         return pipe
     except Exception as e:
-        logger.error("Failed to load model %s: %s", model_key, e)
+        logger.error("Failed to load %s from file: %s", model_key, e)
         return None
 
 
+def load_model(model_key: str, hf_model_id: str, filename: str, download_url: str) -> "StableDiffusionXLPipeline | None":
+    # Try file first (faster if already downloaded)
+    path = os.path.join(VOLUME_PATH, filename)
+    if os.path.exists(path):
+        pipe = _load_from_file(model_key, filename, "")
+        if pipe:
+            return pipe
+
+    # Try HuggingFace Hub (no IP restrictions, caches to volume)
+    pipe = _load_from_hf(model_key, hf_model_id)
+    if pipe:
+        return pipe
+
+    # Fallback: download from direct URL (CivitAI or other)
+    if download_url:
+        return _load_from_file(model_key, filename, download_url)
+
+    return None
+
+
 def preload():
-    p = load_pipe("lustify", LUSTIFY_MODEL, LUSTIFY_MODEL_URL)
+    p = load_model("lustify", LUSTIFY_HF_MODEL, LUSTIFY_MODEL, LUSTIFY_MODEL_URL)
     if p:
         pipes["lustify"] = p
 
-    p = load_pipe("zimage", ZIMAGE_MODEL, ZIMAGE_MODEL_URL)
+    p = load_model("zimage", ZIMAGE_HF_MODEL, ZIMAGE_MODEL, ZIMAGE_MODEL_URL)
     if p:
         pipes["zimage"] = p
 
     if not pipes:
-        logger.error(
-            "No models loaded. Volume path: %s. Set LUSTIFY_MODEL_URL / ZIMAGE_MODEL_URL to download.",
-            VOLUME_PATH
-        )
+        logger.error("No models loaded. Volume path: %s", VOLUME_PATH)
     else:
         logger.info("Ready. Loaded models: %s", list(pipes.keys()))
 
@@ -141,15 +201,21 @@ def handler(job: dict) -> dict:
 
     logger.info("Generating [%s] %dx%d steps=%d prompt='%.80s'", model_key, width, height, steps, prompt)
 
+    is_turbo = "turbo" in getattr(pipe, "config", {}).get("_name_or_path", "").lower() or model_key == "zimage"
+    gen_kwargs = {
+        "prompt": prompt,
+        "width": width,
+        "height": height,
+        "num_inference_steps": steps,
+    }
+    if not is_turbo:
+        gen_kwargs["negative_prompt"] = negative_prompt
+        gen_kwargs["guidance_scale"] = cfg_scale
+    else:
+        gen_kwargs["guidance_scale"] = 0.0
+
     with torch.inference_mode():
-        result = pipe(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            width=width,
-            height=height,
-            num_inference_steps=steps,
-            guidance_scale=cfg_scale,
-        )
+        result = pipe(**gen_kwargs)
 
     image: Image.Image = result.images[0]
     buf = io.BytesIO()
