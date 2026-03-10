@@ -8,8 +8,9 @@ const { logger } = require('@librechat/data-schemas');
 const paths = require('~/config/paths');
 
 const PROXY_API_KEY = process.env.IMAGE_PROXY_KEY || 'kyns-image-internal';
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 5000;
 const POLL_TIMEOUT_MS = 300_000;
+const NO_WORKER_CANCEL_MS = 120_000;
 const WATERMARK_TEXT = 'kyns.ai';
 
 const router = express.Router();
@@ -44,10 +45,12 @@ async function addWatermark(buffer) {
 }
 
 async function pollRunpodJob(endpointId, jobId, apiKey) {
+  const healthUrl = `https://api.runpod.ai/v2/${endpointId}/health`;
   const statusUrl = `https://api.runpod.ai/v2/${endpointId}/status/${jobId}`;
   const cancelUrl = `https://api.runpod.ai/v2/${endpointId}/cancel/${jobId}`;
   const start = Date.now();
-  let inQueueCount = 0;
+  let firstWorkerSeen = false;
+
   while (Date.now() - start < POLL_TIMEOUT_MS) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     const resp = await axios.get(statusUrl, { headers: { Authorization: `Bearer ${apiKey}` } });
@@ -55,11 +58,22 @@ async function pollRunpodJob(endpointId, jobId, apiKey) {
     if (status === 'COMPLETED') return output;
     if (status === 'FAILED' || error) throw new Error(`RunPod job failed: ${error || 'unknown'}`);
     if (status === 'CANCELLED') throw new Error('Geração cancelada.');
-    if (status === 'IN_QUEUE') {
-      inQueueCount++;
-      if (inQueueCount >= 10) {
-        await axios.post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` } }).catch(() => {});
-        throw new Error('Sem GPU disponível agora. O servidor de imagem está offline ou sobrecarregado. Tente novamente em alguns minutos.');
+
+    if (status === 'IN_QUEUE' || status === 'IN_PROGRESS') {
+      if (status === 'IN_PROGRESS') firstWorkerSeen = true;
+      const elapsed = Date.now() - start;
+      if (!firstWorkerSeen && elapsed > NO_WORKER_CANCEL_MS) {
+        const health = await axios
+          .get(healthUrl, { headers: { Authorization: `Bearer ${apiKey}` } })
+          .catch(() => ({ data: { workers: {} } }));
+        const w = health.data?.workers ?? {};
+        const hasWorkers = (w.idle ?? 0) + (w.initializing ?? 0) + (w.ready ?? 0) + (w.running ?? 0) > 0;
+        if (!hasWorkers) {
+          await axios.post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` } }).catch(() => {});
+          throw new Error(
+            'Sem GPU disponível agora. O servidor de imagem está aquecendo — tente novamente em 1-2 minutos.',
+          );
+        }
       }
     }
   }
