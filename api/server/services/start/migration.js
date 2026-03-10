@@ -3,7 +3,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const { logger } = require('@librechat/data-schemas');
 const { ensureRequiredCollectionsExist } = require('@librechat/api');
-const { AccessRoleIds, ResourceType, PrincipalType, Constants } = require('librechat-data-provider');
+const { AccessRoleIds, ResourceType, PrincipalType, Constants, SystemRoles, PermissionTypes, Permissions } = require('librechat-data-provider');
 const {
   logPromptMigrationWarning,
   checkAgentPermissionsMigration,
@@ -13,6 +13,7 @@ const { grantPermission } = require('~/server/services/PermissionService');
 const { getProjectByName, addAgentIdsToProject } = require('~/models/Project');
 const { Agent, PromptGroup } = require('~/db/models');
 const { findRoleByIdentifier } = require('~/models');
+const { updateAccessPermissions, getRoleByName } = require('~/models/Role');
 
 async function runAgentPermissionsMigration() {
   const db = mongoose.connection.db;
@@ -332,8 +333,62 @@ async function checkMigrations() {
   }
 }
 
+
+const ADMIN_EMAIL = 'contact@kyns.ai';
+
+/**
+ * Ensures contact@kyns.ai has the ADMIN role so they can access all features,
+ * including the agent builder, regardless of registration order.
+ */
+async function ensureAdminRole() {
+  try {
+    const db = mongoose.connection.db;
+    if (!db) return;
+
+    const result = await db.collection('users').updateOne(
+      { email: ADMIN_EMAIL, role: { $ne: SystemRoles.ADMIN } },
+      { $set: { role: SystemRoles.ADMIN } },
+    );
+
+    if (result.modifiedCount > 0) {
+      logger.info(`[AdminSetup] Granted ADMIN role to ${ADMIN_EMAIL}`);
+    }
+  } catch (e) {
+    logger.error(`[AdminSetup] Failed to set admin role: ${e.message}`);
+  }
+}
+
+/**
+ * Restricts regular users from creating/editing agents.
+ * The USER role's AGENTS.CREATE permission is set to false so only ADMIN
+ * users can build and edit agents in the marketplace.
+ * Safe to run on every startup — only updates when a change is needed.
+ */
+async function restrictUserAgentCreation() {
+  try {
+    const userRole = await getRoleByName(SystemRoles.USER);
+    const currentCreate = userRole?.permissions?.[PermissionTypes.AGENTS]?.[Permissions.CREATE];
+
+    if (currentCreate === false) {
+      return;
+    }
+
+    await updateAccessPermissions(
+      SystemRoles.USER,
+      { [PermissionTypes.AGENTS]: { [Permissions.CREATE]: false } },
+      userRole,
+    );
+    logger.info('[AdminSetup] USER role: AGENTS.CREATE set to false (admin-only builder)');
+  } catch (e) {
+    logger.error(`[AdminSetup] Failed to restrict user agent creation: ${e.message}`);
+  }
+}
+
+
 module.exports = {
   checkMigrations,
   fixMissingAgentAvatars,
   migrateAllAvatarsToDataUri,
+  ensureAdminRole,
+  restrictUserAgentCreation,
 };

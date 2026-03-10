@@ -202,7 +202,7 @@ endpoints:
   agents:
     model: "llmfan46/Qwen3.5-27B-heretic-v2"
     provider: "openAI"
-    disableBuilder: true
+    disableBuilder: false
     addParams:
       chat_template_kwargs:
         enable_thinking: false
