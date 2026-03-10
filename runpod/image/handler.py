@@ -111,7 +111,7 @@ def _load_from_hf(model_key: str, hf_model_id: str) -> "StableDiffusionXLPipelin
         try:
             pipe.enable_xformers_memory_efficient_attention()
         except Exception:
-            pass
+            pipe.enable_attention_slicing()
         logger.info("Model %s loaded from HuggingFace successfully.", model_key)
         return pipe
     except Exception as e:
@@ -138,7 +138,7 @@ def _load_from_file(model_key: str, filename: str, download_url: str) -> "Stable
         try:
             pipe.enable_xformers_memory_efficient_attention()
         except Exception:
-            pass
+            pipe.enable_attention_slicing()
         logger.info("Model %s loaded from file successfully.", model_key)
         return pipe
     except Exception as e:
