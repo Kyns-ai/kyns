@@ -1,10 +1,8 @@
-import { MongoClient, Db, Collection, type Document } from 'mongodb'
+import { MongoClient, MongoTopologyClosedError, Db, Collection, type Document } from 'mongodb'
 
 declare global {
   var _mongoClient: MongoClient | undefined
 }
-
-let db: Db
 
 async function createClient(): Promise<MongoClient> {
   const uri = process.env.MONGODB_URI
@@ -18,37 +16,38 @@ async function createClient(): Promise<MongoClient> {
   return c
 }
 
-function isClientAlive(c: MongoClient): boolean {
-  try {
-    const topology = (c as unknown as { topology?: { isConnected?: () => boolean } }).topology
-    return topology?.isConnected?.() ?? true
-  } catch {
-    return false
-  }
-}
-
-export async function getDb(): Promise<Db> {
-  if (db && global._mongoClient && isClientAlive(global._mongoClient)) {
-    return db
-  }
-
-  if (global._mongoClient && !isClientAlive(global._mongoClient)) {
-    try { await global._mongoClient.close() } catch { /* already closed */ }
-    global._mongoClient = undefined
-    db = undefined as unknown as Db
-  }
-
+async function getClient(): Promise<MongoClient> {
   if (!global._mongoClient) {
     global._mongoClient = await createClient()
   }
+  return global._mongoClient
+}
 
-  db = global._mongoClient.db(process.env.MONGODB_DB_NAME ?? 'LibreChat')
-  return db
+async function resetClient(): Promise<MongoClient> {
+  if (global._mongoClient) {
+    try { await global._mongoClient.close() } catch { /* ignore */ }
+    global._mongoClient = undefined
+  }
+  global._mongoClient = await createClient()
+  return global._mongoClient
+}
+
+export async function getDb(): Promise<Db> {
+  const c = await getClient()
+  return c.db(process.env.MONGODB_DB_NAME ?? 'LibreChat')
 }
 
 export async function getCollection<T extends Document = Document>(name: string): Promise<Collection<T>> {
-  const database = await getDb()
-  return database.collection<T>(name)
+  try {
+    const database = await getDb()
+    return database.collection<T>(name)
+  } catch (e) {
+    if (e instanceof MongoTopologyClosedError) {
+      const c = await resetClient()
+      return c.db(process.env.MONGODB_DB_NAME ?? 'LibreChat').collection<T>(name)
+    }
+    throw e
+  }
 }
 
 export async function ensureIndexes(): Promise<void> {
@@ -89,4 +88,16 @@ export async function setCache(key: string, data: unknown): Promise<void> {
       { $set: { data, updatedAt: new Date() } },
       { upsert: true }
     )
+}
+
+export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    if (e instanceof MongoTopologyClosedError) {
+      await resetClient()
+      return fn()
+    }
+    throw e
+  }
 }

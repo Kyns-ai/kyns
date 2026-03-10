@@ -1,3 +1,4 @@
+import { withRetry } from '../lib/mongodb'
 import { getDAU, getWAU, getMAU, getRetentionRates, getCohortAnalysis, getEngagementStats } from '../lib/queries/retention'
 import { getFeatureUsage, getFeatureRetentionCorrelation } from '../lib/queries/features'
 import { getCharacterStats, getCharacterRetention } from '../lib/queries/characters'
@@ -7,41 +8,47 @@ import { getConversationStats, getTopFirstMessageWords, getMessageLengthDistribu
 import { getWeeklyChurn } from '../lib/queries/growth'
 import { getDailyErrorRate } from '../lib/queries/quality'
 
+async function safeRun<T>(label: string, fn: () => Promise<T>): Promise<void> {
+  try {
+    await withRetry(fn)
+  } catch (e) {
+    console.error(`[CacheWorker] ${label} failed:`, e)
+  }
+}
+
 async function runAllAggregations() {
   const start = Date.now()
   console.log('[CacheWorker] Starting aggregations...')
 
-  const tasks = [
-    getDAU(30).catch((e) => console.error('[CacheWorker] DAU failed:', e)),
-    getDAU(90).catch((e) => console.error('[CacheWorker] DAU-90 failed:', e)),
-    getWAU(12).catch((e) => console.error('[CacheWorker] WAU failed:', e)),
-    getMAU(6).catch((e) => console.error('[CacheWorker] MAU failed:', e)),
-    getRetentionRates().catch((e) => console.error('[CacheWorker] Retention failed:', e)),
-    getCohortAnalysis().catch((e) => console.error('[CacheWorker] Cohort failed:', e)),
-    getEngagementStats(7).catch((e) => console.error('[CacheWorker] Engagement failed:', e)),
-    getFeatureUsage().catch((e) => console.error('[CacheWorker] Features failed:', e)),
-    getFeatureRetentionCorrelation().catch((e) => console.error('[CacheWorker] Feature retention failed:', e)),
-    getCharacterStats(30).catch((e) => console.error('[CacheWorker] Characters failed:', e)),
-    getCharacterRetention(30).catch((e) => console.error('[CacheWorker] Char retention failed:', e)),
-    getCostSummary(30).catch((e) => console.error('[CacheWorker] Cost failed:', e)),
-    getActivationFunnel(30).catch((e) => console.error('[CacheWorker] Funnel failed:', e)),
-    getTimeToFirstMessage().catch((e) => console.error('[CacheWorker] Time-to-first failed:', e)),
-    getConversationStats(30).catch((e) => console.error('[CacheWorker] Convo stats failed:', e)),
-    getTopFirstMessageWords().catch((e) => console.error('[CacheWorker] Words failed:', e)),
-    getMessageLengthDistribution().catch((e) => console.error('[CacheWorker] Msg length failed:', e)),
-    getWeeklyChurn(8).catch((e) => console.error('[CacheWorker] Churn failed:', e)),
-    getDailyErrorRate(14).catch((e) => console.error('[CacheWorker] Error rate failed:', e)),
-  ]
+  await Promise.all([
+    safeRun('DAU', () => getDAU(30)),
+    safeRun('DAU-90', () => getDAU(90)),
+    safeRun('WAU', () => getWAU(12)),
+    safeRun('MAU', () => getMAU(6)),
+    safeRun('Retention', () => getRetentionRates()),
+    safeRun('Cohort', () => getCohortAnalysis()),
+    safeRun('Engagement', () => getEngagementStats(7)),
+    safeRun('Features', () => getFeatureUsage()),
+    safeRun('Feature retention', () => getFeatureRetentionCorrelation()),
+    safeRun('Characters', () => getCharacterStats(30)),
+    safeRun('Char retention', () => getCharacterRetention(30)),
+    safeRun('Cost', () => getCostSummary(30)),
+    safeRun('Funnel', () => getActivationFunnel(30)),
+    safeRun('Time-to-first', () => getTimeToFirstMessage()),
+    safeRun('Activation', () => getActivationRate(30)),
+    safeRun('Convo stats', () => getConversationStats(30)),
+    safeRun('Words', () => getTopFirstMessageWords()),
+    safeRun('Msg length', () => getMessageLengthDistribution()),
+    safeRun('Churn', () => getWeeklyChurn(8)),
+    safeRun('Error rate', () => getDailyErrorRate(14)),
+  ])
 
-  await Promise.all(tasks)
   console.log(`[CacheWorker] Done in ${Date.now() - start}ms`)
 }
 
 export function runCacheWorker() {
-  // Delay first run by 10s to let server warm up
   setTimeout(async () => {
     await runAllAggregations()
-    // Refresh every 5 minutes
     setInterval(() => {
       runAllAggregations().catch((e) => console.error('[CacheWorker] Error:', e))
     }, 5 * 60 * 1000)
