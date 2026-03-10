@@ -106,7 +106,10 @@ function ChatView({ index = 0 }: { index?: number }) {
       return agentGreetingTree?.length ? agentGreetingTree : null;
     }
     if (agentGreetingTree?.length) {
-      return [...agentGreetingTree, ...messagesTree];
+      // Make greeting the root with real messages as its children so MultiMessage
+      // renders the greeting first and then recurses into the real conversation tree.
+      const greetingRoot = { ...agentGreetingTree[0], children: messagesTree };
+      return [greetingRoot];
     }
     return messagesTree;
   }, [messagesTree, agentGreetingTree]);

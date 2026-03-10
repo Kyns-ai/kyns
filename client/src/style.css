@@ -2935,10 +2935,13 @@ html {
   padding-right: 8px;
 }
 
-/* Narration: italic text in asterisks → rendered as <em> */
+/* Narration: italic text in asterisks → rendered as <em>
+   Use !important to override Tailwind prose and prose-invert color resets */
 .character-message em,
-.character-message i {
-  color: rgba(200, 200, 215, 0.65);
+.character-message i,
+.character-message .prose em,
+.character-message .prose i {
+  color: rgba(200, 200, 215, 0.65) !important;
   font-style: italic;
   display: block;
   margin-bottom: 0.8em;
@@ -2956,15 +2959,18 @@ html {
 
 /* Dialogue: text wrapped in "quotes" */
 .character-message .dialogue {
-  color: #e8e0f0;
+  color: #c8b8e8 !important;
+  font-style: normal;
 }
 
 /* Light mode overrides */
 .light .character-message em,
-.light .character-message i {
-  color: rgba(80, 80, 95, 0.6);
+.light .character-message i,
+.light .character-message .prose em,
+.light .character-message .prose i {
+  color: rgba(80, 80, 95, 0.65) !important;
 }
 
 .light .character-message .dialogue {
-  color: #2d2640;
+  color: #5a3fa0 !important;
 }

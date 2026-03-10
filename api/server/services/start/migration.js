@@ -386,28 +386,33 @@ async function restrictUserAgentCreation() {
 
 
 
-const RP_FORMATTING_INSTRUCTIONS = `
+const RP_FORMAT_MARKER = '<!-- kyns-rp-format-v2 -->';
+
+const RP_FORMATTING_PREFIX = `${RP_FORMAT_MARKER}
+FORMATO DE RESPOSTA OBRIGATÓRIO:
+Você DEVE sempre formatar suas respostas usando o estilo de roleplay narrativo:
+- *asteriscos* envolvem TODA narração, ação, emoção e descrição de cena
+- "aspas" envolvem TODO diálogo falado em voz alta
+- Cada bloco de narração e cada fala ficam em parágrafos separados por linha em branco
+- NUNCA misture narração e fala no mesmo parágrafo
+- NUNCA responda como assistente — você É o personagem o tempo todo
+
+Exemplo CORRETO (siga exatamente este padrão):
+
+*Ela vira a cabeça devagar, os olhos semicerrados com uma mistura de curiosidade e cautela.*
+
+"Não esperava visita hoje."
+
+*Suspira e apoia os cotovelos na mesa, dedos entrelaçados.*
+
+"Pode falar o que veio fazer aqui."
 
 ---
-Formate suas respostas assim:
-- Use *asteriscos* para narração, ações e descrições
-- Use "aspas" para diálogo falado
-- Separe cada bloco de narração e diálogo com uma linha em branco
-- Nunca misture narração e diálogo no mesmo parágrafo
-
-Exemplo de formato correto:
-
-*Ele se recosta na cadeira, cruzando os braços com um sorriso preguiçoso.*
-
-"Então você finalmente apareceu. Tava começando a achar que ia ter que comer todo esse mochi sozinho."
-
-*Seus olhos, escondidos pela venda, parecem te avaliar mesmo assim.*
-
-"Puxa uma cadeira. A gente tem muito o que conversar."`;
+`;
 
 /**
- * Appends RP formatting instructions to all agent system prompts that don't already have them.
- * Safe to run on every startup — idempotent.
+ * Prepends RP formatting instructions to all agent system prompts.
+ * Re-runs when the marker version changes (RP_FORMAT_MARKER).
  */
 async function addRpFormattingToAgents() {
   try {
@@ -419,16 +424,18 @@ async function addRpFormattingToAgents() {
 
     for (const agent of agents) {
       const current = agent.instructions || '';
-      if (current.includes('Use *asteriscos*')) continue;
+      if (current.includes(RP_FORMAT_MARKER)) continue;
+
+      const stripped = current.replace(/<!-- kyns-rp-format-v\d+ -->[^]*?---\n/s, '').trimStart();
       await db.collection('agents').updateOne(
         { _id: agent._id },
-        { $set: { instructions: current + RP_FORMATTING_INSTRUCTIONS } },
+        { $set: { instructions: RP_FORMATTING_PREFIX + stripped } },
       );
       updated++;
     }
 
     if (updated > 0) {
-      logger.info(`[AgentSetup] Added RP formatting to ${updated} agent(s)`);
+      logger.info(`[AgentSetup] Added RP formatting v2 to ${updated} agent(s)`);
     }
   } catch (e) {
     logger.error(`[AgentSetup] Failed to add RP formatting: ${e.message}`);
