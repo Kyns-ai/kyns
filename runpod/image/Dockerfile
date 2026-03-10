@@ -1,21 +1,21 @@
-# KYNS Image Generation Worker for RunPod Serverless
-# GPU: A40 (48GB VRAM) — Lustify v7 (SDXL FP16 ~6.5GB) + Z-Image Turbo (DiT BF16 ~12GB)
-FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-devel
 
-WORKDIR /app
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
 
-# Install Python deps — diffusers from source for ZImagePipeline support
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1-mesa-glx libglib2.0-0 wget curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY handler.py .
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
 
-# Network volume mount point
+COPY handler.py /handler.py
+
 ENV VOLUME_PATH=/runpod-volume
-# HuggingFace cache on the network volume (persists across workers)
 ENV HF_HOME=/runpod-volume/hf-cache
 ENV TRANSFORMERS_CACHE=/runpod-volume/hf-cache
-
 ENV LUSTIFY_MODEL=lustifySDXLNSFW_ggwpV7.safetensors
+ENV ZIMAGE_MODEL=zImageTurbo_v1.safetensors
 
-CMD ["python", "-u", "handler.py"]
+CMD ["python3", "/handler.py"]

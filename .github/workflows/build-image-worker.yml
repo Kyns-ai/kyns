@@ -46,3 +46,16 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Make package public
+        continue-on-error: true
+        run: |
+          gh api -X PATCH \
+            "/orgs/${{ github.repository_owner }}/packages/container/kyns-image-worker" \
+            -f visibility=public || \
+          gh api -X PATCH \
+            "/user/packages/container/kyns-image-worker" \
+            -f visibility=public || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
