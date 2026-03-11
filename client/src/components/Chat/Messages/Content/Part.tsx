@@ -5,6 +5,7 @@ import {
   ToolCallTypes,
   imageGenTools,
   isImageVisionTool,
+  extractSuggestions,
   extractThinkingContent,
 } from 'librechat-data-provider';
 import { memo } from 'react';
@@ -84,11 +85,12 @@ const Part = memo(
         </>
       );
     } else if (part.type === ContentTypes.TEXT) {
-      const text = typeof part.text === 'string' ? part.text : part.text?.value;
+      const rawText = typeof part.text === 'string' ? part.text : part.text?.value;
 
-      if (typeof text !== 'string') {
+      if (typeof rawText !== 'string') {
         return null;
       }
+      const { cleanText: text } = extractSuggestions(rawText);
       const extracted = extractThinkingContent(text);
       if (part.tool_call_ids != null && extracted.regularContent.length === 0) {
         return null;

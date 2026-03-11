@@ -809,3 +809,77 @@ export function stripAgentIdSuffix(agentId: string): string {
 export function appendAgentIdSuffix(agentId: string, index: number): string {
   return `${agentId}____${index}`;
 }
+
+const SUGGESTIONS_PATTERN = /\[suggestions\]([\s\S]*?)\[\/suggestions\]/g;
+const MAX_SUGGESTIONS = 4;
+
+export type ExtractedSuggestions = {
+  cleanText: string;
+  suggestions: string[];
+};
+
+/**
+ * Extracts `[suggestions]...[/suggestions]` blocks from LLM output.
+ * Returns the text with those blocks removed and a list of suggestion strings.
+ * If no tags are found, returns the original text with an empty suggestions array.
+ */
+export function extractSuggestions(text: string): ExtractedSuggestions {
+  if (!text || !text.includes('[suggestions]')) {
+    return { cleanText: text, suggestions: [] };
+  }
+
+  const suggestions: string[] = [];
+  const cleanText = text.replace(SUGGESTIONS_PATTERN, (_match, inner: string) => {
+    const lines = inner
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    for (const line of lines) {
+      if (suggestions.length < MAX_SUGGESTIONS) {
+        suggestions.push(line);
+      }
+    }
+    return '';
+  }).trim();
+
+  return { cleanText, suggestions };
+}
+
+const THINK_PATTERN = /<think>[\s\S]*?<\/think>/g;
+const SUGGESTIONS_BLOCK_PATTERN = /\[suggestions\][\s\S]*?\[\/suggestions\]/g;
+const ITALIC_ASTERISK_PATTERN = /\*[^*\n]+\*/g;
+const BOLD_PATTERN = /\*\*([^*]+)\*\*/g;
+const BOLD_UNDERSCORE_PATTERN = /__([^_]+)__/g;
+const HEADERS_PATTERN = /^#{1,6}\s+/gm;
+const LINK_PATTERN = /\[([^\]]+)\]\([^)]+\)/g;
+const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
+const INLINE_CODE_PATTERN = /`([^`]+)`/g;
+const EMOJI_PATTERN =
+  /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+const MULTI_NEWLINE_PATTERN = /\n{2,}/g;
+const MULTI_SPACE_PATTERN = / {2,}/g;
+
+/**
+ * Strips markdown, thinking blocks, suggestion tags, and emoji from text
+ * before sending to a TTS provider so only spoken dialogue remains.
+ */
+export function sanitizeTextForTTS(text: string): string {
+  if (!text) {
+    return text;
+  }
+
+  return text
+    .replace(THINK_PATTERN, '')
+    .replace(SUGGESTIONS_BLOCK_PATTERN, '')
+    .replace(CODE_BLOCK_PATTERN, '')
+    .replace(ITALIC_ASTERISK_PATTERN, '')
+    .replace(BOLD_PATTERN, '$1')
+    .replace(BOLD_UNDERSCORE_PATTERN, '$1')
+    .replace(HEADERS_PATTERN, '')
+    .replace(LINK_PATTERN, '$1')
+    .replace(INLINE_CODE_PATTERN, '$1')
+    .replace(EMOJI_PATTERN, '')
+    .replace(MULTI_NEWLINE_PATTERN, '. ')
+    .replace(MULTI_SPACE_PATTERN, ' ')
+    .trim();
+}

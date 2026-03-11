@@ -1083,3 +1083,12 @@ export interface ActiveJobsResponse {
 export const getActiveJobs = (): Promise<ActiveJobsResponse> => {
   return request.get(endpoints.activeJobs());
 };
+
+export type SuggestionEventPayload = {
+  text: string;
+  endpoint?: string;
+  conversationId?: string;
+};
+
+export const logSuggestionClick = (payload: SuggestionEventPayload): Promise<{ logged: boolean }> =>
+  request.post(endpoints.suggestionEvent(), payload);

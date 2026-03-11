@@ -1,15 +1,17 @@
 import React, { useCallback, useMemo, memo } from 'react';
 import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
-import { isAgentsEndpoint, type TMessage } from 'librechat-data-provider';
+import { isAgentsEndpoint, dataService, extractSuggestions, type TMessage } from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon } from '~/common';
+import SuggestionChips from '~/components/Chat/Messages/Content/Parts/SuggestionChips';
 import MessageContent from '~/components/Chat/Messages/Content/MessageContent';
 import PlaceholderRow from '~/components/Chat/Messages/ui/PlaceholderRow';
 import SiblingSwitch from '~/components/Chat/Messages/SiblingSwitch';
 import HoverButtons from '~/components/Chat/Messages/HoverButtons';
 import MessageIcon from '~/components/Chat/Messages/MessageIcon';
 import AvatarLightbox from '~/components/Chat/Messages/AvatarLightbox';
-import { useLocalize, useMessageActions, useContentMetadata } from '~/hooks';
+import { useLocalize, useMessageActions, useContentMetadata, useSubmitMessage } from '~/hooks';
+import { useGetStartupConfig } from '~/data-provider';
 import SubRow from '~/components/Chat/Messages/SubRow';
 import { cn, getMessageAriaLabel, getAgentAvatarUrl } from '~/utils';
 import { fontSizeAtom } from '~/store/fontSize';
@@ -87,6 +89,36 @@ const MessageRender = memo(
     );
 
     const { hasParallelContent } = useContentMetadata(msg);
+    const showSuggestions = useRecoilValue(store.showSuggestions);
+    const { data: startupConfig } = useGetStartupConfig();
+    const adminSuggestionsEnabled = startupConfig?.interface?.suggestions !== false;
+
+    const suggestions = useMemo(() => {
+      if (
+        !isLast ||
+        effectiveIsSubmitting ||
+        msg?.isCreatedByUser ||
+        !showSuggestions ||
+        !adminSuggestionsEnabled ||
+        !msg?.text
+      ) {
+        return [];
+      }
+      return extractSuggestions(msg.text).suggestions;
+    }, [isLast, effectiveIsSubmitting, msg?.isCreatedByUser, msg?.text, showSuggestions, adminSuggestionsEnabled]);
+
+    const { submitMessage } = useSubmitMessage();
+    const handleSuggestionClick = useCallback(
+      (text: string) => {
+        submitMessage({ text });
+        dataService.logSuggestionClick({
+          text,
+          endpoint: conversation?.endpoint ?? '',
+          conversationId: conversation?.conversationId ?? '',
+        });
+      },
+      [submitMessage, conversation?.endpoint, conversation?.conversationId],
+    );
 
     if (!msg) {
       return null;
@@ -180,6 +212,12 @@ const MessageRender = memo(
                 />
               </MessageContext.Provider>
             </div>
+            {suggestions.length > 0 && (
+              <SuggestionChips
+                suggestions={suggestions}
+                onSuggestionClick={handleSuggestionClick}
+              />
+            )}
             {hasNoChildren && effectiveIsSubmitting ? (
               <PlaceholderRow />
             ) : (
@@ -202,6 +240,7 @@ const MessageRender = memo(
                   latestMessage={latestMessage}
                   handleFeedback={handleFeedback}
                   isLast={isLast}
+                  agentVoice={agent?.voice ?? undefined}
                 />
               </SubRow>
             )}

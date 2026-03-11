@@ -663,6 +663,7 @@ export const interfaceSchema = z
       .optional(),
     fileSearch: z.boolean().optional(),
     fileCitations: z.boolean().optional(),
+    suggestions: z.boolean().optional(),
     remoteAgents: z
       .object({
         use: z.boolean().optional(),
@@ -681,6 +682,7 @@ export const interfaceSchema = z
     multiConvo: true,
     bookmarks: true,
     memories: true,
+    suggestions: true,
     prompts: {
       use: true,
       create: true,
@@ -1838,6 +1840,8 @@ export enum LocalStorageKeys {
   PIN_WEB_SEARCH_ = 'PIN_WEB_SEARCH_',
   /** Pin state for Code Interpreter per conversation ID */
   PIN_CODE_INTERPRETER_ = 'PIN_CODE_INTERPRETER_',
+  /** Key for user preference to show/hide suggestion chips after assistant messages */
+  SHOW_SUGGESTIONS = 'showSuggestions',
 }
 
 export enum ForkOptions {
