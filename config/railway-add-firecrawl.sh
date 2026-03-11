@@ -4,19 +4,23 @@
 # Prerequisites:
 #   - Railway project already has a Redis service (managed database named "Redis")
 #   - Railway CLI logged in and project linked
+#   - ghcr.io/kyns-ai/firecrawl-worker:latest published via GitHub Actions
+#     (triggered automatically when firecrawl-worker/Dockerfile changes)
 #
-# Architecture (2 new Railway services + existing Redis):
+# Architecture (3 new Railway services + existing Redis):
 #   Redis               -- already exists in the project (managed database)
-#   firecrawl-puppeteer -- headless browser for JS-heavy pages (anti-bot stealth)
-#   firecrawl           -- Firecrawl API (scrape/crawl, Firecrawl v1 compatible)
+#   firecrawl-puppeteer -- headless browser for JS-heavy pages (stealth)
+#   firecrawl           -- Firecrawl v1 API (HTTP, queues jobs to Redis)
+#   firecrawl-worker2   -- BullMQ job processor (runs queue-worker.ts)
 #
-# Images: devflowinc/firecrawl-simple fork (AGPL-3.0, no billing, no AI features)
-#   trieve/firecrawl:v0.0.55            (API, ~901 MB)
-#   trieve/puppeteer-service-ts:v0.0.13 (headless browser, ~1.1 GB)
+# Images:
+#   trieve/firecrawl:v0.0.55              (API, ~901 MB)
+#   trieve/puppeteer-service-ts:v0.0.13   (headless browser, ~1.1 GB)
+#   ghcr.io/kyns-ai/firecrawl-worker:latest (worker, inherits trieve/firecrawl:v0.0.55)
 #
 # Usage: ./config/railway-add-firecrawl.sh
-# This script is idempotent-safe: re-running it will fail on existing services
-# but the variable set + redeploy steps will still run.
+# IMPORTANT: The worker image must be built first via GitHub Actions
+# (push to main with changes in firecrawl-worker/ triggers the build).
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -51,7 +55,7 @@ FIRECRAWL_INTERNAL_URL="http://firecrawl.railway.internal:3002"
 # 1. Puppeteer microservice
 # ---------------------------------------------------------------------------
 echo ""
-echo "Step 1/3 — Deploying firecrawl-puppeteer..."
+echo "Step 1/4 — Deploying firecrawl-puppeteer..."
 
 railway add \
   --service "firecrawl-puppeteer" \
@@ -65,7 +69,7 @@ echo "Puppeteer service created: ${PUPPETEER_INTERNAL_URL}"
 # 2. Firecrawl API service
 # ---------------------------------------------------------------------------
 echo ""
-echo "Step 2/3 — Deploying firecrawl API..."
+echo "Step 2/4 — Deploying firecrawl API..."
 
 railway add \
   --service "firecrawl" \
@@ -81,10 +85,28 @@ railway add \
 echo "Firecrawl API service created: ${FIRECRAWL_INTERNAL_URL}"
 
 # ---------------------------------------------------------------------------
-# 3. Wire into LibreChat env vars
+# 3. Firecrawl BullMQ worker (custom image with overridden CMD)
 # ---------------------------------------------------------------------------
 echo ""
-echo "Step 3/3 — Setting Firecrawl vars on LibreChat service..."
+echo "Step 3/4 — Deploying firecrawl BullMQ worker..."
+echo "  (using ghcr.io/kyns-ai/firecrawl-worker:latest — must be built first)"
+
+railway add \
+  --service "firecrawl-worker2" \
+  --image "ghcr.io/kyns-ai/firecrawl-worker:latest" \
+  --variables "REDIS_URL=${REDIS_URL}" \
+  --variables "REDIS_RATE_LIMIT_URL=${REDIS_URL}" \
+  --variables "PLAYWRIGHT_MICROSERVICE_URL=${PUPPETEER_INTERNAL_URL}" \
+  --variables "USE_DB_AUTHENTICATION=false" \
+  --variables "FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}"
+
+echo "Firecrawl worker service created"
+
+# ---------------------------------------------------------------------------
+# 4. Wire into LibreChat env vars
+# ---------------------------------------------------------------------------
+echo ""
+echo "Step 4/4 — Setting Firecrawl vars on LibreChat service..."
 
 railway variable set \
   --service LibreChat \
@@ -103,11 +125,12 @@ echo ""
 echo " Railway services:"
 echo "   firecrawl-puppeteer : ${PUPPETEER_INTERNAL_URL}"
 echo "   firecrawl           : ${FIRECRAWL_INTERNAL_URL}"
+echo "   firecrawl-worker2   : (same Redis, processes jobs)"
 echo ""
 echo " LibreChat env vars:"
 echo "   FIRECRAWL_API_URL   = ${FIRECRAWL_INTERNAL_URL}"
 echo "   FIRECRAWL_API_KEY   = ${FIRECRAWL_API_KEY}"
 echo ""
-echo " librechat.yaml already has scraperProvider: firecrawl"
+echo " librechat.yaml scraperProvider=firecrawl already configured."
 echo " Push the repo to trigger Railway redeploy."
 echo "========================================================"
