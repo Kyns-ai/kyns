@@ -6,8 +6,8 @@ import { useMessageContext } from '~/Providers';
 import { cn } from '~/utils';
 import store from '~/store';
 
-const MIN_CHARS_PER_FRAME = 16;
-const TARGET_STREAM_FRAMES = 48;
+const MIN_CHARS_PER_FRAME = 3;
+const TARGET_STREAM_FRAMES = 90;
 
 type TextPartProps = {
   text: string;

@@ -50,7 +50,7 @@ speech:
       url: '${TTS_BASE_URL}'
       apiKey: '${TTS_API_KEY}'
       model: 'tts-1'
-      voices: ['ALL']
+      voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
   speechTab:
     textToSpeech:
       engineTTS: 'external'

@@ -94,6 +94,14 @@ class TTSService {
     });
   }
 
+  setResponseContentType(res, response) {
+    if (res.headersSent) {
+      return;
+    }
+
+    res.setHeader('Content-Type', response?.headers?.['content-type'] ?? 'audio/mpeg');
+  }
+
   /**
    * Prepares the request for OpenAI TTS provider.
    * @param {Object} ttsSchema - The TTS schema for OpenAI.
@@ -299,13 +307,13 @@ class TTSService {
         role: req.user?.role,
       }));
     try {
-      res.setHeader('Content-Type', 'audio/mpeg');
       const provider = this.getProvider(appConfig);
       const ttsSchema = appConfig?.speech?.tts?.[provider];
       const voice = await this.getVoice(ttsSchema, requestVoice);
 
       if (input.length < 4096) {
         const response = await this.ttsRequest(provider, ttsSchema, { input, voice });
+        this.setResponseContentType(res, response);
         response.data.pipe(res);
         return;
       }
@@ -320,6 +328,7 @@ class TTSService {
             stream: true,
           });
 
+          this.setResponseContentType(res, response);
           logger.debug(`[textToSpeech] user: ${req?.user?.id} | writing audio stream`);
           await new Promise((resolve) => {
             response.data.pipe(res, { end: chunk.isFinished });
@@ -360,7 +369,6 @@ class TTSService {
    * @returns {Promise<void>}
    */
   async streamAudio(req, res) {
-    res.setHeader('Content-Type', 'audio/mpeg');
     const appConfig =
       req.config ??
       (await getAppConfig({
@@ -404,6 +412,7 @@ class TTSService {
               break;
             }
 
+            this.setResponseContentType(res, response);
             logger.debug(`[streamAudio] user: ${req?.user?.id} | writing audio stream`);
             await new Promise((resolve) => {
               response.data.pipe(res, { end: update.isFinished });

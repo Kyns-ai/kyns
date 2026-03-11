@@ -132,6 +132,11 @@ export type SpeechToTextResponse = {
   text: string;
 };
 
+export type TextToSpeechResponse = {
+  audioData: ArrayBuffer;
+  contentType: string;
+};
+
 export type VoiceResponse = string[];
 
 export type UploadMutationOptions = {
@@ -153,7 +158,7 @@ export type SpeechToTextOptions = {
 };
 
 export type TextToSpeechOptions = {
-  onSuccess?: (data: ArrayBuffer, variables: FormData, context?: unknown) => void;
+  onSuccess?: (data: TextToSpeechResponse, variables: FormData, context?: unknown) => void;
   onMutate?: (variables: FormData) => void | Promise<unknown>;
   onError?: (error: unknown, variables: FormData, context?: unknown) => void;
 };

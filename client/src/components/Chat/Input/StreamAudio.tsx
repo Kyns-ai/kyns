@@ -107,13 +107,12 @@ export default function StreamAudio({ index = 0 }) {
         }
 
         const reader = response.body.getReader();
-
-        const type = 'audio/mpeg';
+        const audioMimeType = response.headers.get('content-type') ?? 'audio/mpeg';
         const browserSupportsType =
-          typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(type);
+          typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(audioMimeType);
         let mediaSource: MediaSourceAppender | undefined;
         if (browserSupportsType) {
-          mediaSource = new MediaSourceAppender(type);
+          mediaSource = new MediaSourceAppender(audioMimeType);
           setGlobalAudioURL(mediaSource.mediaSourceUrl);
         }
 
@@ -146,7 +145,7 @@ export default function StreamAudio({ index = 0 }) {
           if (!cacheKey) {
             throw new Error('Cache key not found');
           }
-          const audioBlob = new Blob(chunks, { type });
+          const audioBlob = new Blob(chunks, { type: audioMimeType });
           const cachedResponse = new Response(audioBlob);
           await cache.put(cacheKey, cachedResponse);
           if (!browserSupportsType) {

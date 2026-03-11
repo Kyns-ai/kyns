@@ -687,7 +687,7 @@ export const speechToText = (data: FormData): Promise<f.SpeechToTextResponse> =>
   return request.postMultiPart(endpoints.speechToText(), data);
 };
 
-export const textToSpeech = (data: FormData): Promise<ArrayBuffer> => {
+export const textToSpeech = (data: FormData): Promise<f.TextToSpeechResponse> => {
   return request.postTTS(endpoints.textToSpeechManual(), data);
 };
 

@@ -12,6 +12,9 @@ const createFormData = (text: string, voice: string) => {
   return formData;
 };
 
+const getTTSCacheKey = (text: string, voice?: string | null) =>
+  `tts:${voice && voice.trim() ? voice : '__default__'}:${text}`;
+
 type TUseTTSExternal = {
   setIsSpeaking: React.Dispatch<React.SetStateAction<boolean>>;
   audioRef: React.MutableRefObject<HTMLAudioElement | null>;
@@ -104,14 +107,15 @@ function useTextToSpeechExternal({
         });
       }
     },
-    onSuccess: async (data: ArrayBuffer, variables) => {
+    onSuccess: async ({ audioData, contentType }, variables) => {
       try {
         const inputText = (variables.get('input') ?? '') as string;
-        const audioBlob = new Blob([data], { type: 'audio/mpeg' });
+        const requestedVoice = (variables.get('voice') ?? '') as string;
+        const audioBlob = new Blob([audioData], { type: contentType });
 
         if (cacheTTS && inputText) {
           const cache = await caches.open('tts-responses');
-          const request = new Request(inputText);
+          const request = new Request(getTTSCacheKey(inputText, requestedVoice));
           const response = new Response(audioBlob);
           cache.put(request, response);
         }
@@ -151,7 +155,7 @@ function useTextToSpeechExternal({
   };
 
   const handleCachedResponse = async (text: string, download: boolean) => {
-    const cachedResponse = await caches.match(text);
+    const cachedResponse = await caches.match(getTTSCacheKey(text, voice));
     if (!cachedResponse) {
       return startMutation(text, download);
     }

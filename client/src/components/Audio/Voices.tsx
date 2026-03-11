@@ -43,6 +43,10 @@ export function ExternalVoiceDropdown() {
   const { voices = [] } = useTTSExternal();
   const [voice, setVoice] = useRecoilState(store.voice);
 
+  if (voices.length === 0) {
+    return null;
+  }
+
   const handleVoiceChange = (newValue?: string | Option) => {
     logger.log('External Voice changed:', newValue);
     const newVoice = typeof newValue === 'string' ? newValue : newValue?.value;

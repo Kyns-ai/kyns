@@ -45,7 +45,11 @@ async function getVoices(req, res) {
         throw new Error('Invalid provider');
     }
 
-    res.json(voices);
+    const availableVoices = Array.isArray(voices)
+      ? [...new Set(voices.filter((voice) => voice && voice.toUpperCase() !== 'ALL'))]
+      : [];
+
+    res.json(availableVoices);
   } catch (error) {
     res.status(500).json({ error: `Failed to get voices: ${error.message}` });
   }
