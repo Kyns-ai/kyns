@@ -2927,50 +2927,46 @@ html {
   background-color: #f5f5f5;
 }
 
-/* ===== CHARACTER / ROLEPLAY MESSAGE STYLES ===== */
+/* ===== ROLEPLAY / CHARACTER MESSAGE STYLES ===== */
 
-.character-message {
-  line-height: 1.7;
-  padding-left: 8px;
-  padding-right: 8px;
+/* Dialogue: text wrapped in "quotes" */
+.rp-message .rp-dialogue {
+  color: #e8e0f0;
+  display: inline;
 }
 
-/* Narration: italic text in asterisks → rendered as <em>
-   Use !important to override Tailwind prose and prose-invert color resets */
-.character-message em,
-.character-message i,
-.character-message .prose em,
-.character-message .prose i {
-  color: rgba(200, 200, 215, 0.65) !important;
+/* Parenthetical actions like (smiles softly) */
+.rp-message .rp-action {
+  color: rgba(200, 200, 215, 0.72) !important;
   font-style: italic;
-  display: block;
-  margin-bottom: 0.8em;
+}
+
+/* Narration: italic text via *asterisks* → rendered as <em>
+   Use !important to override Tailwind prose and prose-invert color resets */
+.rp-message em {
+  color: rgba(200, 200, 215, 0.6) !important;
+  font-style: italic;
 }
 
 /* Paragraph spacing */
-.character-message p {
-  margin-bottom: 0.9em;
+.rp-message p {
+  margin-bottom: 1em;
   line-height: 1.7;
 }
 
-.character-message p:last-child {
+.rp-message p:last-child {
   margin-bottom: 0;
 }
 
-/* Dialogue: text wrapped in "quotes" — white so it stands out from grey narration */
-.character-message .dialogue {
-  color: #ffffff !important;
-  font-style: normal;
-}
-
 /* Light mode overrides */
-.light .character-message em,
-.light .character-message i,
-.light .character-message .prose em,
-.light .character-message .prose i {
-  color: rgba(80, 80, 95, 0.65) !important;
+.light .rp-message .rp-dialogue {
+  color: #6b21a8;
 }
 
-.light .character-message .dialogue {
-  color: #1a1a2e !important;
+.light .rp-message .rp-action {
+  color: rgba(80, 80, 100, 0.8) !important;
+}
+
+.light .rp-message em {
+  color: rgba(80, 80, 100, 0.7) !important;
 }

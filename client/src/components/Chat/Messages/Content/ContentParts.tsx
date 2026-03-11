@@ -25,6 +25,7 @@ type PartWithContextProps = {
   isSubmitting: boolean;
   isLatestMessage?: boolean;
   isCreatedByUser: boolean;
+  isCharacterMessage?: boolean;
   isLast: boolean;
   partAttachments: TAttachment[] | undefined;
 };
@@ -39,6 +40,7 @@ const PartWithContext = memo(function PartWithContext({
   isSubmitting,
   isLatestMessage,
   isCreatedByUser,
+  isCharacterMessage,
   isLast,
   partAttachments,
 }: PartWithContextProps) {
@@ -51,8 +53,9 @@ const PartWithContext = memo(function PartWithContext({
       nextType,
       isSubmitting,
       isLatestMessage,
+      isCharacterMessage,
     }),
-    [messageId, conversationId, idx, nextType, isSubmitting, isLatestMessage],
+    [messageId, conversationId, idx, nextType, isSubmitting, isLatestMessage, isCharacterMessage],
   );
 
   return (
@@ -77,6 +80,7 @@ type ContentPartsProps = {
   attachments?: TAttachment[];
   searchResults?: { [key: string]: SearchResultData };
   isCreatedByUser: boolean;
+  isCharacterMessage?: boolean;
   isLast: boolean;
   isSubmitting: boolean;
   isLatestMessage?: boolean;
@@ -110,6 +114,7 @@ const ContentParts = memo(function ContentParts({
   searchResults,
   conversationId,
   isCreatedByUser,
+  isCharacterMessage,
   isLatestMessage,
   showResponseTimer = false,
 }: ContentPartsProps) {
@@ -130,6 +135,7 @@ const ContentParts = memo(function ContentParts({
           conversationId={conversationId}
           isLatestMessage={isLatestMessage}
           isCreatedByUser={isCreatedByUser}
+          isCharacterMessage={isCharacterMessage}
           nextType={content?.[idx + 1]?.type}
           isSubmitting={effectiveIsSubmitting}
           partAttachments={attachmentMap[toolCallId]}
@@ -142,6 +148,7 @@ const ContentParts = memo(function ContentParts({
       conversationId,
       effectiveIsSubmitting,
       isCreatedByUser,
+      isCharacterMessage,
       isLast,
       isLatestMessage,
       messageId,

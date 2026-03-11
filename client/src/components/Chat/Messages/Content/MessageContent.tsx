@@ -9,6 +9,7 @@ import { useMessageContext } from '~/Providers';
 import MarkdownLite from './MarkdownLite';
 import EditMessage from './EditMessage';
 import Thinking from './Parts/Thinking';
+import { useStreamingAnimation } from '~/hooks/useStreamingAnimation';
 import { useLocalize } from '~/hooks';
 import Container from './Container';
 import Markdown from './Markdown';
@@ -85,7 +86,7 @@ export const ErrorMessage = ({
 };
 
 const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplayProps) => {
-  const { isSubmitting = false, isLatestMessage = false } = useMessageContext();
+  const { isSubmitting = false, isLatestMessage = false, isCharacterMessage = false } = useMessageContext();
   const enableUserMsgMarkdown = useRecoilValue(store.enableUserMsgMarkdown);
 
   const showCursorState = useMemo(
@@ -93,15 +94,18 @@ const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplay
     [showCursor, isSubmitting],
   );
 
+  const isStreaming = isSubmitting && isLatestMessage && !isCreatedByUser;
+  const visibleText = useStreamingAnimation({ text, isStreaming });
+
   const content = useMemo(() => {
     if (!isCreatedByUser) {
-      return <Markdown content={text} isLatestMessage={isLatestMessage} />;
+      return <Markdown content={visibleText} isLatestMessage={isLatestMessage} isRoleplay={isCharacterMessage} />;
     }
     if (enableUserMsgMarkdown) {
-      return <MarkdownLite content={text} />;
+      return <MarkdownLite content={visibleText} />;
     }
-    return <>{text}</>;
-  }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage]);
+    return <>{visibleText}</>;
+  }, [isCreatedByUser, enableUserMsgMarkdown, visibleText, isLatestMessage, isCharacterMessage]);
 
   return (
     <Container message={message}>
@@ -112,6 +116,7 @@ const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplay
           showCursorState && text.length > 0 && 'result-streaming',
           isCreatedByUser && !enableUserMsgMarkdown && 'whitespace-pre-wrap',
           isCreatedByUser ? 'dark:text-gray-20' : 'dark:text-gray-100',
+          isCharacterMessage && !isCreatedByUser && 'rp-message',
         )}
       >
         {content}

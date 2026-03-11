@@ -1,13 +1,14 @@
-import { memo, useMemo, useEffect, useRef, useState, type ReactElement } from 'react';
+import { memo, useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
+import type { ReactElement } from 'react';
+import { extractSuggestions, extractThinkingContent } from 'librechat-data-provider';
 import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
+import { useStreamingAnimation } from '~/hooks/useStreamingAnimation';
 import Markdown from '~/components/Chat/Messages/Content/Markdown';
+import Thinking from '~/components/Chat/Messages/Content/Parts/Thinking';
 import { useMessageContext } from '~/Providers';
 import { cn } from '~/utils';
 import store from '~/store';
-
-const MIN_CHARS_PER_FRAME = 3;
-const TARGET_STREAM_FRAMES = 90;
 
 type TextPartProps = {
   text: string;
@@ -20,72 +21,118 @@ type ContentType =
   | ReactElement<React.ComponentProps<typeof MarkdownLite>>
   | ReactElement;
 
+const normalizeThinkingText = (value: string) => value.replace(/\r\n/g, '\n').trim();
+
+const stripDuplicatedResponseFromThinking = (thinking: string, response: string) => {
+  const normalizedThinking = normalizeThinkingText(thinking);
+  const normalizedResponse = normalizeThinkingText(response);
+
+  if (!normalizedThinking || !normalizedResponse) {
+    return normalizedThinking;
+  }
+
+  if (normalizedThinking === normalizedResponse) {
+    return '';
+  }
+
+  if (normalizedThinking.endsWith(normalizedResponse)) {
+    return normalizeThinkingText(
+      normalizedThinking.slice(0, normalizedThinking.length - normalizedResponse.length),
+    );
+  }
+
+  return normalizedThinking;
+};
+
 const TextPart = memo(function TextPart({ text, isCreatedByUser, showCursor }: TextPartProps) {
-  const { isSubmitting = false, isLatestMessage = false } = useMessageContext();
+  const { isSubmitting = false, isLatestMessage = false, isCharacterMessage = false } = useMessageContext();
   const enableUserMsgMarkdown = useRecoilValue(store.enableUserMsgMarkdown);
   const showCursorState = useMemo(() => showCursor && isSubmitting, [showCursor, isSubmitting]);
-  const [displayedLength, setDisplayedLength] = useState(() => text.length);
-  const rafRef = useRef<number | null>(null);
-  const targetLenRef = useRef(text.length);
 
-  useEffect(() => {
-    if (!isSubmitting || !isLatestMessage || isCreatedByUser) {
-      setDisplayedLength(text.length);
-      targetLenRef.current = text.length;
-      return;
-    }
-    targetLenRef.current = text.length;
-    if (text.length <= displayedLength) {
-      return;
-    }
+  const isStreaming = isSubmitting && isLatestMessage && !isCreatedByUser;
+  const visibleText = useStreamingAnimation({ text, isStreaming });
 
-    const tick = () => {
-      setDisplayedLength((current) => {
-        const target = targetLenRef.current;
-        const charsPerFrame = Math.max(
-          MIN_CHARS_PER_FRAME,
-          Math.ceil(target / TARGET_STREAM_FRAMES),
-        );
-        const next = Math.min(current + charsPerFrame, target);
-        if (next < target) {
-          rafRef.current = requestAnimationFrame(tick);
+  const cleanVisibleText = useMemo(
+    () => (!isCreatedByUser ? extractSuggestions(visibleText).cleanText : visibleText),
+    [visibleText, isCreatedByUser],
+  );
+
+  const { thinkingSegments, regularContent, hasThinking } = useMemo(() => {
+    if (isCreatedByUser) {
+      return { thinkingSegments: [] as Array<{ type: string; content: string }>, regularContent: '', hasThinking: false };
+    }
+    const extracted = extractThinkingContent(cleanVisibleText);
+    const thinkSegs = extracted.segments
+      .filter((s) => s.type === 'think')
+      .map((segment, index, allSegments) => {
+        const isLastThinkingSegment =
+          index === allSegments.length - 1 ||
+          allSegments.slice(index + 1).every((nextSegment) => nextSegment.type !== 'think');
+
+        if (!isLastThinkingSegment) {
+          return segment;
         }
-        return next;
-      });
+
+        return {
+          ...segment,
+          content: stripDuplicatedResponseFromThinking(segment.content, extracted.regularContent),
+        };
+      })
+      .filter((segment) => segment.content.length > 0);
+    return {
+      thinkingSegments: thinkSegs,
+      regularContent: extracted.regularContent,
+      hasThinking: thinkSegs.length > 0,
     };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (rafRef.current != null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
+  }, [cleanVisibleText, isCreatedByUser]);
+
+  const content: ContentType | null = useMemo(() => {
+    if (isCreatedByUser) {
+      if (enableUserMsgMarkdown) {
+        return <MarkdownLite content={visibleText} />;
       }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, isSubmitting, isLatestMessage, isCreatedByUser]);
-
-  useEffect(() => {
-    if (!isSubmitting && text.length > 0) {
-      setDisplayedLength(text.length);
-      targetLenRef.current = text.length;
-    }
-  }, [isSubmitting, text.length]);
-
-  const visibleText = useMemo(() => {
-    if (!isSubmitting || !isLatestMessage || isCreatedByUser || displayedLength >= text.length) {
-      return text;
-    }
-    return text.slice(0, displayedLength);
-  }, [text, displayedLength, isSubmitting, isLatestMessage, isCreatedByUser]);
-
-  const content: ContentType = useMemo(() => {
-    if (!isCreatedByUser) {
-      return <Markdown content={visibleText} isLatestMessage={isLatestMessage} />;
-    } else if (enableUserMsgMarkdown) {
-      return <MarkdownLite content={visibleText} />;
-    } else {
       return <>{visibleText}</>;
     }
-  }, [isCreatedByUser, enableUserMsgMarkdown, visibleText, isLatestMessage]);
+    if (hasThinking) {
+      return null;
+    }
+    return (
+      <Markdown content={cleanVisibleText} isLatestMessage={isLatestMessage} isRoleplay={isCharacterMessage} />
+    );
+  }, [
+    isCreatedByUser,
+    enableUserMsgMarkdown,
+    visibleText,
+    cleanVisibleText,
+    isLatestMessage,
+    isCharacterMessage,
+    hasThinking,
+  ]);
+
+  const thinkingBlocks = useMemo(() => {
+    if (!hasThinking) {
+      return null;
+    }
+    return (
+      <>
+        {thinkingSegments.map((segment, index) => (
+          <Thinking key={`thinking-${index}`}>{segment.content}</Thinking>
+        ))}
+      </>
+    );
+  }, [hasThinking, thinkingSegments]);
+
+  const regularMarkdown = useMemo(() => {
+    if (!hasThinking) {
+      return null;
+    }
+    if (regularContent.length === 0 && !isStreaming) {
+      return null;
+    }
+    return (
+      <Markdown content={regularContent} isLatestMessage={isLatestMessage} isRoleplay={isCharacterMessage} />
+    );
+  }, [hasThinking, regularContent, isLatestMessage, isCharacterMessage, isStreaming]);
 
   return (
     <div
@@ -95,9 +142,12 @@ const TextPart = memo(function TextPart({ text, isCreatedByUser, showCursor }: T
         'markdown prose message-content dark:prose-invert light w-full break-words',
         isCreatedByUser && !enableUserMsgMarkdown && 'whitespace-pre-wrap',
         isCreatedByUser ? 'dark:text-gray-20' : 'dark:text-gray-100',
+        isCharacterMessage && !isCreatedByUser && 'rp-message',
       )}
     >
+      {thinkingBlocks}
       {content}
+      {regularMarkdown}
     </div>
   );
 });
