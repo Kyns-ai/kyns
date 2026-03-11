@@ -37,9 +37,9 @@ RUN \
     npm config set fetch-retry-maxtimeout 600000 ; \
     npm config set fetch-retries 5 ; \
     npm config set fetch-retry-mintimeout 15000 ; \
-    npm ci --no-audit ; \
+    npm ci --no-audit --legacy-peer-deps ; \
     # Work around npm optional dependency resolution on Alpine for Rollup
-    npm install --no-save @rollup/rollup-linux-x64-musl
+    npm install --no-save @rollup/rollup-linux-x64-musl --legacy-peer-deps
 
 COPY --chown=node:node . .
 
@@ -48,6 +48,7 @@ RUN \
     NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run frontend && \
     test -f /app/client/dist/index.html && \
     npm prune --production && \
+    npm install @img/sharp-linuxmusl-x64@0.33.5 @img/sharp-libvips-linuxmusl-x64@1.0.4 --no-save --legacy-peer-deps && \
     npm cache clean --force
 
 # Node API setup
