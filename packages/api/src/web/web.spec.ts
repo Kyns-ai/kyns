@@ -7,7 +7,8 @@ import type {
   TCustomConfig,
   RerankerTypes,
 } from 'librechat-data-provider';
-import { loadWebSearchAuth, extractWebSearchEnvVars } from './web';
+import { loadWebSearchAuth, extractWebSearchEnvVars, isWebSearchSufficientlyAuthenticated } from './web';
+import type { WebSearchAuthResult } from './web';
 
 // Mock the extractVariableName function
 jest.mock('../utils', () => ({
@@ -629,6 +630,75 @@ describe('web.ts', () => {
 
       // Restore original env
       process.env = originalEnv;
+    });
+  });
+
+  describe('isWebSearchSufficientlyAuthenticated', () => {
+    const baseResult: WebSearchAuthResult = {
+      authenticated: false,
+      authTypes: [],
+      authResult: {},
+    };
+
+    it('returns true when searchProvider is set, even if authenticated is false', () => {
+      const result: WebSearchAuthResult = {
+        ...baseResult,
+        authResult: { searchProvider: 'searxng' as SearchProviders },
+      };
+      expect(isWebSearchSufficientlyAuthenticated(result)).toBe(true);
+    });
+
+    it('returns true when authenticated is true regardless of searchProvider', () => {
+      const result: WebSearchAuthResult = { ...baseResult, authenticated: true };
+      expect(isWebSearchSufficientlyAuthenticated(result)).toBe(true);
+    });
+
+    it('returns false when searchProvider is absent and authenticated is false', () => {
+      expect(isWebSearchSufficientlyAuthenticated(baseResult)).toBe(false);
+    });
+
+    it('returns false when searchProvider is undefined and authenticated is false', () => {
+      const result: WebSearchAuthResult = {
+        ...baseResult,
+        authResult: { scraperProvider: 'firecrawl' as ScraperProviders },
+      };
+      expect(isWebSearchSufficientlyAuthenticated(result)).toBe(false);
+    });
+
+    it('returns true for provider-only config without scraper or reranker', async () => {
+      const config: TCustomConfig['webSearch'] = {
+        searxngInstanceUrl: '${SEARXNG_INSTANCE_URL}',
+        searchProvider: 'searxng' as SearchProviders,
+        safeSearch: SafeSearchTypes.MODERATE,
+      };
+
+      const mockLoad = jest.fn().mockResolvedValue({ SEARXNG_INSTANCE_URL: 'https://searxng.example.com' });
+      const authResult = await loadWebSearchAuth({
+        userId: 'u1',
+        webSearchConfig: config,
+        loadAuthValues: mockLoad,
+        throwError: false,
+      });
+
+      expect(isWebSearchSufficientlyAuthenticated(authResult)).toBe(true);
+    });
+
+    it('returns false when provider auth fails regardless of scraper/reranker', async () => {
+      const config: TCustomConfig['webSearch'] = {
+        searxngInstanceUrl: '${SEARXNG_INSTANCE_URL}',
+        searchProvider: 'searxng' as SearchProviders,
+        safeSearch: SafeSearchTypes.MODERATE,
+      };
+
+      const mockLoad = jest.fn().mockResolvedValue({});
+      const authResult = await loadWebSearchAuth({
+        userId: 'u1',
+        webSearchConfig: config,
+        loadAuthValues: mockLoad,
+        throwError: false,
+      });
+
+      expect(isWebSearchSufficientlyAuthenticated(authResult)).toBe(false);
     });
   });
 

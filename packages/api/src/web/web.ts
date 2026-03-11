@@ -204,3 +204,13 @@ export async function loadWebSearchAuth({
     authenticated,
   };
 }
+
+/**
+ * Determines if web search can proceed based on lenient criteria: only the
+ * search provider needs to be authenticated. Scrapers and rerankers are treated
+ * as optional enhancements, consistent with how `verifyWebSearchAuth` reports
+ * auth status to the UI.
+ */
+export function isWebSearchSufficientlyAuthenticated(result: WebSearchAuthResult): boolean {
+  return result.authResult?.searchProvider != null || result.authenticated;
+}

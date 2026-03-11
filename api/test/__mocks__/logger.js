@@ -1,14 +1,15 @@
 jest.mock('winston', () => {
-  const mockFormatFunction = jest.fn((fn) => fn);
+  const noopFormat = () => ({ transform: (info) => info });
+  const mockFormatFunction = jest.fn((fn) => () => ({ transform: fn || ((info) => info) }));
 
-  mockFormatFunction.colorize = jest.fn();
-  mockFormatFunction.combine = jest.fn();
-  mockFormatFunction.label = jest.fn();
-  mockFormatFunction.timestamp = jest.fn();
-  mockFormatFunction.printf = jest.fn();
-  mockFormatFunction.errors = jest.fn();
-  mockFormatFunction.splat = jest.fn();
-  mockFormatFunction.json = jest.fn();
+  mockFormatFunction.colorize = jest.fn(() => noopFormat);
+  mockFormatFunction.combine = jest.fn(() => noopFormat);
+  mockFormatFunction.label = jest.fn(() => noopFormat);
+  mockFormatFunction.timestamp = jest.fn(() => noopFormat);
+  mockFormatFunction.printf = jest.fn(() => noopFormat);
+  mockFormatFunction.errors = jest.fn(() => noopFormat);
+  mockFormatFunction.splat = jest.fn(() => noopFormat);
+  mockFormatFunction.json = jest.fn(() => noopFormat);
   return {
     format: mockFormatFunction,
     createLogger: jest.fn().mockReturnValue({

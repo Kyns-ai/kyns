@@ -1,7 +1,7 @@
 const { nanoid } = require('nanoid');
 const { EnvVar } = require('@librechat/agents');
 const { logger } = require('@librechat/data-schemas');
-const { checkAccess, loadWebSearchAuth } = require('@librechat/api');
+const { checkAccess, loadWebSearchAuth, isWebSearchSufficientlyAuthenticated } = require('@librechat/api');
 const {
   Tools,
   AuthType,
@@ -46,15 +46,8 @@ const verifyWebSearchAuth = async (req, res) => {
       throwError: false,
     });
 
-    // Scrapers and rerankers are optional enhancements. If the search provider
-    // (e.g. SearXNG) resolved successfully, treat overall auth as successful
-    // even if scrapers/rerankers have no credentials configured.
-    const authenticated = result.authResult?.searchProvider
-      ? true
-      : result.authenticated;
-
     return res.status(200).json({
-      authenticated,
+      authenticated: isWebSearchSufficientlyAuthenticated(result),
       authTypes: result.authTypes,
     });
   } catch (error) {
