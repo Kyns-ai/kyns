@@ -42,7 +42,10 @@ const TextPart = memo(function TextPart({ text, isCreatedByUser, showCursor }: T
     const tick = () => {
       setDisplayedLength((current) => {
         const target = targetLenRef.current;
-        const charsPerFrame = Math.max(MIN_CHARS_PER_FRAME, Math.ceil(target / TARGET_STREAM_FRAMES));
+        const charsPerFrame = Math.max(
+          MIN_CHARS_PER_FRAME,
+          Math.ceil(target / TARGET_STREAM_FRAMES),
+        );
         const next = Math.min(current + charsPerFrame, target);
         if (next < target) {
           rafRef.current = requestAnimationFrame(tick);
@@ -57,6 +60,7 @@ const TextPart = memo(function TextPart({ text, isCreatedByUser, showCursor }: T
         rafRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, isSubmitting, isLatestMessage, isCreatedByUser]);
 
   useEffect(() => {

@@ -193,5 +193,13 @@
       "admin/",
       "packages/"
     ]
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.4",
+    "@react-spring/web": "^10.0.3",
+    "@tanstack/react-virtual": "^3.13.21",
+    "framer-motion": "^12.35.2",
+    "lucide-react": "^0.525.0",
+    "react-hook-form": "^7.71.2"
   }
 }
