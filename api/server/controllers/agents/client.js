@@ -830,6 +830,7 @@ class AgentClient extends BaseClient {
     const nextPayload = [...payload];
     nextPayload[targetIndex] = {
       ...targetMessage,
+      role: targetMessage?.role ?? 'user',
       content: appendTextToMessageContent(
         targetMessage?.content ?? targetMessage?.text ?? '',
         `Web search context:\n${normalizedContent}`,
@@ -850,7 +851,7 @@ class AgentClient extends BaseClient {
     }
 
     this.removeToolFromAgentConfig(Tools.web_search);
-    return nextPayload;
+    return nextPayload.filter(Boolean);
   }
 
   isKynsImageEndpoint() {
