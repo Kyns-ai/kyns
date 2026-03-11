@@ -1,31 +1,11 @@
 """
 RunPod Serverless handler for KYNS image generation.
 
-Models are loaded from HuggingFace Hub (preferred) or from a direct URL.
-If a network volume is attached, models are cached there across restarts.
+Supported models:
+  - lustify: John6666/lustify-sdxl-nsfw-checkpoint-ggwp-v7-sdxl
+  - zimage:  stabilityai/sdxl-turbo
 
-Primary models (HuggingFace Hub, no auth needed):
-  - lustify: RunDiffusion/Juggernaut-XL-v9  (photorealistic, NSFW-capable)
-  - zimage:  stabilityai/sdxl-turbo          (fast, 4 steps)
-
-Override with env vars:
-  LUSTIFY_HF_MODEL  (default: RunDiffusion/Juggernaut-XL-v9)
-  ZIMAGE_HF_MODEL   (default: stabilityai/sdxl-turbo)
-  LUSTIFY_MODEL_URL / ZIMAGE_MODEL_URL  (direct .safetensors URL as fallback)
-  CIVITAI_TOKEN     (for CivitAI download auth, used when URL contains civitai.com)
-  HF_TOKEN          (HuggingFace token for gated models)
-
-Input:
-  {
-    "prompt": "...",
-    "model": "lustify" | "zimage",
-    "width": 1024, "height": 1024,
-    "steps": 30, "cfg_scale": 7.0,
-    "negative_prompt": "..."
-  }
-
-Output:
-  {"image": "<base64 PNG>"}
+This worker only supports the two KYNS image models above.
 """
 
 import os
@@ -37,6 +17,7 @@ import urllib.request
 import torch
 import runpod
 from diffusers import StableDiffusionXLPipeline, AutoPipelineForText2Image
+from huggingface_hub import hf_hub_download
 from PIL import Image
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -46,17 +27,45 @@ VOLUME_PATH = os.getenv("VOLUME_PATH", "/runpod-volume")
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 CIVITAI_TOKEN = os.getenv("CIVITAI_TOKEN", "")
 
-LUSTIFY_HF_MODEL = os.getenv("LUSTIFY_HF_MODEL", "RunDiffusion/Juggernaut-XL-v9")
+LUSTIFY_HF_MODEL = os.getenv("LUSTIFY_HF_MODEL", "John6666/lustify-sdxl-nsfw-checkpoint-ggwp-v7-sdxl")
 ZIMAGE_HF_MODEL  = os.getenv("ZIMAGE_HF_MODEL",  "stabilityai/sdxl-turbo")
 
 LUSTIFY_MODEL_URL = os.getenv("LUSTIFY_MODEL_URL", "")
 ZIMAGE_MODEL_URL  = os.getenv("ZIMAGE_MODEL_URL",  "")
 
-# Legacy safetensors filenames (used only when MODEL_URL is a direct file URL)
-LUSTIFY_MODEL = os.getenv("LUSTIFY_MODEL", "lustify_model.safetensors")
-ZIMAGE_MODEL  = os.getenv("ZIMAGE_MODEL",  "zimage_model.safetensors")
+LUSTIFY_MODEL = os.getenv("LUSTIFY_MODEL", "lustifySDXLNSFW_ggwpV7.safetensors")
+ZIMAGE_MODEL  = os.getenv("ZIMAGE_MODEL",  "sd_xl_turbo_1.0_fp16.safetensors")
 
 pipes: dict = {}
+
+
+def _cache_dir() -> str:
+    path = os.path.join(VOLUME_PATH, "hf-cache")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _model_dir() -> str:
+    path = os.path.join(VOLUME_PATH, "models")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _hf_download_kwargs() -> dict:
+    kwargs = {
+        "cache_dir": _cache_dir(),
+    }
+    if HF_TOKEN:
+        kwargs["token"] = HF_TOKEN
+    return kwargs
+
+
+def _enable_memory_optimizations(pipe):
+    try:
+        pipe.enable_xformers_memory_efficient_attention()
+    except Exception:
+        pipe.enable_attention_slicing()
+    return pipe
 
 
 def _download_url(url: str, dest: str) -> bool:
@@ -89,10 +98,9 @@ def _download_url(url: str, dest: str) -> bool:
         return False
 
 
-def _load_from_hf(model_key: str, hf_model_id: str) -> "StableDiffusionXLPipeline | None":
-    cache_dir = os.path.join(VOLUME_PATH, "hf-cache")
-    os.makedirs(cache_dir, exist_ok=True)
-    logger.info("Loading %s from HuggingFace: %s (cache: %s)", model_key, hf_model_id, cache_dir)
+def _load_diffusers_pipeline(model_key: str, hf_model_id: str) -> "StableDiffusionXLPipeline | None":
+    cache_dir = _cache_dir()
+    logger.info("Loading %s diffusers pipeline: %s (cache: %s)", model_key, hf_model_id, cache_dir)
     try:
         kwargs = {
             "torch_dtype": torch.float16,
@@ -108,19 +116,31 @@ def _load_from_hf(model_key: str, hf_model_id: str) -> "StableDiffusionXLPipelin
             del kwargs["variant"]
             pipe = AutoPipelineForText2Image.from_pretrained(hf_model_id, **kwargs)
         pipe = pipe.to("cuda")
-        try:
-            pipe.enable_xformers_memory_efficient_attention()
-        except Exception:
-            pipe.enable_attention_slicing()
-        logger.info("Model %s loaded from HuggingFace successfully.", model_key)
+        _enable_memory_optimizations(pipe)
+        logger.info("Model %s loaded from diffusers pipeline successfully.", model_key)
         return pipe
     except Exception as e:
-        logger.error("Failed to load %s from HuggingFace: %s", model_key, e)
+        logger.error("Failed to load %s diffusers pipeline: %s", model_key, e)
         return None
 
 
-def _load_from_file(model_key: str, filename: str, download_url: str) -> "StableDiffusionXLPipeline | None":
-    path = os.path.join(VOLUME_PATH, filename)
+def _download_hf_file(model_key: str, hf_model_id: str, filename: str) -> str | None:
+    model_dir = _model_dir()
+    logger.info("Downloading %s checkpoint from HuggingFace repo=%s file=%s", model_key, hf_model_id, filename)
+    try:
+        return hf_hub_download(
+            repo_id=hf_model_id,
+            filename=filename,
+            local_dir=model_dir,
+            local_dir_use_symlinks=False,
+            **_hf_download_kwargs(),
+        )
+    except Exception as e:
+        logger.error("Failed to download %s checkpoint from HuggingFace: %s", model_key, e)
+        return None
+
+
+def _load_from_file(model_key: str, path: str, download_url: str = "") -> "StableDiffusionXLPipeline | None":
     if not os.path.exists(path):
         logger.warning("Model file not found: %s", path)
         if not download_url:
@@ -135,10 +155,7 @@ def _load_from_file(model_key: str, filename: str, download_url: str) -> "Stable
             use_safetensors=True,
         )
         pipe = pipe.to("cuda")
-        try:
-            pipe.enable_xformers_memory_efficient_attention()
-        except Exception:
-            pipe.enable_attention_slicing()
+        _enable_memory_optimizations(pipe)
         logger.info("Model %s loaded from file successfully.", model_key)
         return pipe
     except Exception as e:
@@ -146,32 +163,48 @@ def _load_from_file(model_key: str, filename: str, download_url: str) -> "Stable
         return None
 
 
-def load_model(model_key: str, hf_model_id: str, filename: str, download_url: str) -> "StableDiffusionXLPipeline | None":
-    # Try file first (faster if already downloaded)
-    path = os.path.join(VOLUME_PATH, filename)
-    if os.path.exists(path):
-        pipe = _load_from_file(model_key, filename, "")
+def load_lustify() -> "StableDiffusionXLPipeline | None":
+    local_path = os.path.join(_model_dir(), LUSTIFY_MODEL)
+    if os.path.exists(local_path):
+        pipe = _load_from_file("lustify", local_path)
         if pipe:
             return pipe
 
-    # Try HuggingFace Hub (no IP restrictions, caches to volume)
-    pipe = _load_from_hf(model_key, hf_model_id)
+    downloaded_path = _download_hf_file("lustify", LUSTIFY_HF_MODEL, LUSTIFY_MODEL)
+    if downloaded_path:
+        pipe = _load_from_file("lustify", downloaded_path)
+        if pipe:
+            return pipe
+
+    if LUSTIFY_MODEL_URL:
+        return _load_from_file("lustify", local_path, LUSTIFY_MODEL_URL)
+
+    return None
+
+
+def load_zimage() -> "StableDiffusionXLPipeline | None":
+    pipe = _load_diffusers_pipeline("zimage", ZIMAGE_HF_MODEL)
     if pipe:
         return pipe
 
-    # Fallback: download from direct URL (CivitAI or other)
-    if download_url:
-        return _load_from_file(model_key, filename, download_url)
+    local_path = os.path.join(_model_dir(), ZIMAGE_MODEL)
+    if os.path.exists(local_path):
+        pipe = _load_from_file("zimage", local_path)
+        if pipe:
+            return pipe
+
+    if ZIMAGE_MODEL_URL:
+        return _load_from_file("zimage", local_path, ZIMAGE_MODEL_URL)
 
     return None
 
 
 def preload():
-    p = load_model("lustify", LUSTIFY_HF_MODEL, LUSTIFY_MODEL, LUSTIFY_MODEL_URL)
+    p = load_lustify()
     if p:
         pipes["lustify"] = p
 
-    p = load_model("zimage", ZIMAGE_HF_MODEL, ZIMAGE_MODEL, ZIMAGE_MODEL_URL)
+    p = load_zimage()
     if p:
         pipes["zimage"] = p
 
