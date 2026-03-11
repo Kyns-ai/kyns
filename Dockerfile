@@ -37,7 +37,9 @@ RUN \
     npm config set fetch-retry-maxtimeout 600000 ; \
     npm config set fetch-retries 5 ; \
     npm config set fetch-retry-mintimeout 15000 ; \
-    npm ci --no-audit
+    npm ci --no-audit ; \
+    # Work around npm optional dependency resolution on Alpine for Rollup
+    npm install --no-save @rollup/rollup-linux-x64-musl
 
 COPY --chown=node:node . .
 
