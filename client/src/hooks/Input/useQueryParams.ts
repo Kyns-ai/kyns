@@ -2,93 +2,39 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useSearchParams } from 'react-router-dom';
 import { QueryClient, useQueryClient } from '@tanstack/react-query';
-import {
-  QueryKeys,
-  EModelEndpoint,
-  isAgentsEndpoint,
-  tQueryParamsSchema,
-  isAssistantsEndpoint,
-} from 'librechat-data-provider';
+import { QueryKeys, EModelEndpoint, PermissionBits } from 'librechat-data-provider';
 import type {
-  Agent,
+  AgentListResponse,
   TEndpointsConfig,
   TStartupConfig,
   TPreset,
 } from 'librechat-data-provider';
-import type { ZodAny } from 'zod';
 import {
   clearModelForNonEphemeralAgent,
   removeUnavailableTools,
+  processValidSettings,
   getModelSpecIconURL,
   getConvoSwitchLogic,
   logger,
 } from '~/utils';
+import { useAuthContext, useAgentsMap, useDefaultConvo, useSubmitMessage } from '~/hooks';
 import { useChatContext, useChatFormContext } from '~/Providers';
-import useSubmitMessage from '~/hooks/Messages/useSubmitMessage';
-import useDefaultConvo from '~/hooks/Conversations/useDefaultConvo';
 import { useGetAgentByIdQuery } from '~/data-provider';
-import { upsertAgentListCaches } from '~/utils/agentCache';
 import store from '~/store';
 
-/**
- * Parses query parameter values, converting strings to their appropriate types.
- * Handles boolean strings, numbers, and preserves regular strings.
- */
-const parseQueryValue = (value: string) => {
-  if (value === 'true') {
-    return true;
-  }
-  if (value === 'false') {
-    return false;
-  }
-  if (!isNaN(Number(value))) {
-    return Number(value);
-  }
-  return value;
-};
+const injectAgentIntoAgentsMap = (queryClient: QueryClient, agent: any) => {
+  const editCacheKey = [QueryKeys.agents, { requiredPermission: PermissionBits.EDIT }];
+  const editCache = queryClient.getQueryData<AgentListResponse>(editCacheKey);
 
-/**
- * Processes and validates URL query parameters using schema definitions.
- * Extracts valid settings based on tQueryParamsSchema and handles special endpoint cases
- * for assistants and agents.
- */
-const processValidSettings = (queryParams: Record<string, string>) => {
-  const validSettings = {} as TPreset;
-
-  Object.entries(queryParams).forEach(([key, value]) => {
-    try {
-      const schema = tQueryParamsSchema.shape[key] as ZodAny | undefined;
-      if (schema) {
-        const parsedValue = parseQueryValue(value);
-        const validValue = schema.parse(parsedValue);
-        validSettings[key] = validValue;
-      }
-    } catch (error) {
-      console.warn(`Invalid value for setting ${key}:`, error);
-    }
-  });
-
-  if (
-    validSettings.assistant_id != null &&
-    validSettings.assistant_id &&
-    !isAssistantsEndpoint(validSettings.endpoint)
-  ) {
-    validSettings.endpoint = EModelEndpoint.assistants;
+  if (editCache?.data && !editCache.data.some((cachedAgent) => cachedAgent.id === agent.id)) {
+    // Inject agent into EDIT cache so dropdown can display it
+    const updatedCache = {
+      ...editCache,
+      data: [agent, ...editCache.data],
+    };
+    queryClient.setQueryData(editCacheKey, updatedCache);
+    logger.log('agent', 'Injected URL agent into cache:', agent);
   }
-  if (
-    validSettings.agent_id != null &&
-    validSettings.agent_id &&
-    !isAgentsEndpoint(validSettings.endpoint)
-  ) {
-    validSettings.endpoint = EModelEndpoint.agents;
-  }
-
-  return validSettings;
-};
-
-const injectAgentIntoAgentsMap = (queryClient: QueryClient, agent: Agent) => {
-  upsertAgentListCaches(queryClient, agent);
-  logger.log('agent', 'Injected URL agent into cache:', agent);
 };
 
 /**
@@ -235,13 +181,12 @@ export default function useQueryParams({
     ],
   );
 
-  /**
-   * Checks if all settings from URL parameters have been successfully applied to the conversation.
-   * Compares values from validSettings against the current conversation state, handling special properties.
-   * Returns true only when all relevant settings match the target values.
-   */
+  const conversationRef = useRef(conversation);
+  conversationRef.current = conversation;
+
   const areSettingsApplied = useCallback(() => {
-    if (!validSettingsRef.current || !conversation) {
+    const convo = conversationRef.current;
+    if (!validSettingsRef.current || !convo) {
       return false;
     }
 
@@ -250,13 +195,13 @@ export default function useQueryParams({
         continue;
       }
 
-      if (conversation[key] !== value) {
+      if (convo[key] !== value) {
         return false;
       }
     }
 
     return true;
-  }, [conversation]);
+  }, []);
 
   /**
    * Processes message submission exactly once, preventing duplicate submissions.
@@ -276,14 +221,12 @@ export default function useQueryParams({
     methods.handleSubmit((data) => {
       if (data.text?.trim()) {
         submitMessage(data);
-
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-
-        console.log('Message submitted with conversation state:', conversation);
+        logger.log('conversation', 'Message submitted from query params');
       }
     })();
-  }, [methods, submitMessage, conversation]);
+
+    setSearchParams(new URLSearchParams(), { replace: true });
+  }, [methods, submitMessage, setSearchParams]);
 
   useEffect(() => {
     const processQueryParams = () => {
@@ -323,6 +266,7 @@ export default function useQueryParams({
       }
 
       const { decodedPrompt, validSettings, shouldAutoSubmit } = processQueryParams();
+      const hasSettings = Object.keys(validSettings).length > 0;
 
       if (!shouldAutoSubmit) {
         submissionHandledRef.current = true;
@@ -330,45 +274,36 @@ export default function useQueryParams({
 
       /** Mark processing as complete and clean up as needed */
       const success = () => {
-        const paramString = searchParams.toString();
-        const currentParams = new URLSearchParams(paramString);
-        currentParams.delete('prompt');
-        currentParams.delete('q');
-        currentParams.delete('submit');
-
-        setSearchParams(currentParams, { replace: true });
         processedRef.current = true;
-        console.log('Parameters processed successfully', paramString);
+        logger.log('conversation', 'Query parameters processed successfully');
         clearInterval(intervalId);
 
-        // Only clean URL if there's no pending submission
+        // Defer URL cleanup until after submission completes (processSubmission handles it)
         if (!pendingSubmitRef.current) {
-          const newUrl = window.location.pathname;
-          window.history.replaceState({}, '', newUrl);
+          setSearchParams(new URLSearchParams(), { replace: true });
         }
       };
 
-      // Store settings for later comparison
-      if (Object.keys(validSettings).length > 0) {
+      if (hasSettings) {
         validSettingsRef.current = validSettings;
       }
 
-      // Save the prompt text for later use if needed
       if (decodedPrompt) {
         promptTextRef.current = decodedPrompt;
       }
 
       // Handle auto-submission
       if (shouldAutoSubmit && decodedPrompt) {
-        if (Object.keys(validSettings).length > 0) {
+        if (hasSettings) {
           // Settings are changing, defer submission
           pendingSubmitRef.current = true;
 
           // Set a timeout to handle the case where settings might never fully apply
           settingsTimeoutRef.current = setTimeout(() => {
             if (!submissionHandledRef.current && pendingSubmitRef.current) {
-              console.warn(
-                'Settings application timeout reached, proceeding with submission anyway',
+              logger.log(
+                'conversation',
+                'Settings application timeout, proceeding with submission',
               );
               processSubmission();
             }
@@ -392,7 +327,7 @@ export default function useQueryParams({
         submissionHandledRef.current = true;
       }
 
-      if (Object.keys(validSettings).length > 0) {
+      if (hasSettings && !areSettingsApplied()) {
         newQueryConvo(validSettings);
       }
 
@@ -415,6 +350,7 @@ export default function useQueryParams({
     setSearchParams,
     queryClient,
     processSubmission,
+    areSettingsApplied,
   ]);
 
   useEffect(() => {
@@ -429,9 +365,7 @@ export default function useQueryParams({
       return;
     }
 
-    const allSettingsApplied = areSettingsApplied();
-
-    if (allSettingsApplied) {
+    if (areSettingsApplied()) {
       settingsAppliedRef.current = true;
 
       if (pendingSubmitRef.current) {
@@ -440,15 +374,17 @@ export default function useQueryParams({
           settingsTimeoutRef.current = null;
         }
 
-        console.log('Settings fully applied, processing submission');
+        logger.log('conversation', 'Settings fully applied, processing submission');
         processSubmission();
       }
     }
   }, [conversation, processSubmission, areSettingsApplied]);
 
+  const { isAuthenticated } = useAuthContext();
+  const agentsMap = useAgentsMap({ isAuthenticated });
   useEffect(() => {
     if (urlAgent) {
       injectAgentIntoAgentsMap(queryClient, urlAgent);
     }
-  }, [urlAgent, queryClient]);
+  }, [urlAgent, queryClient, agentsMap]);
 }

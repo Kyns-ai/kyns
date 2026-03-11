@@ -186,4 +186,7 @@ const MessageContent = ({
   );
 };
 
-export default memo(MessageContent);
+const MemoizedMessageContent = memo(MessageContent);
+MemoizedMessageContent.displayName = 'MessageContent';
+
+export default MemoizedMessageContent;

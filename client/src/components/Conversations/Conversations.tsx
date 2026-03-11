@@ -421,6 +421,7 @@ const Conversations: FC<ConversationsProps> = ({
                 onRowsRendered={handleRowsRendered}
                 tabIndex={-1}
                 style={{ outline: 'none', scrollbarGutter: 'stable' }}
+                containerRole="rowgroup"
               />
             )}
           </AutoSizer>

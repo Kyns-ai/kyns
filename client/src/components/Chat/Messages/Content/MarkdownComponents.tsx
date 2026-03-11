@@ -7,7 +7,7 @@ import CodeBlock from '~/components/Messages/Content/CodeBlock';
 import Mermaid from '~/components/Messages/Content/Mermaid';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
 import { useFileDownload } from '~/data-provider';
-import { useCodeBlockContext, useMessageContext } from '~/Providers';
+import { useCodeBlockContext } from '~/Providers';
 import { handleDoubleClick } from '~/utils';
 import { useLocalize } from '~/hooks';
 import store from '~/store';
@@ -18,7 +18,10 @@ type TCodeProps = {
   children: React.ReactNode;
 };
 
-export const code: React.ElementType = memo(({ className, children }: TCodeProps) => {
+export const code: React.ElementType = memo(function MarkdownCode({
+  className,
+  children,
+}: TCodeProps) {
   const canRunCode = useHasAccess({
     permissionType: PermissionTypes.RUN_CODE,
     permission: Permissions.USE,
@@ -62,8 +65,12 @@ export const code: React.ElementType = memo(({ className, children }: TCodeProps
     );
   }
 });
+code.displayName = 'MarkdownCode';
 
-export const codeNoExecution: React.ElementType = memo(({ className, children }: TCodeProps) => {
+export const codeNoExecution: React.ElementType = memo(function MarkdownCodeNoExecution({
+  className,
+  children,
+}: TCodeProps) {
   const match = /language-(\w+)/.exec(className ?? '');
   const lang = match && match[1];
 
@@ -82,13 +89,14 @@ export const codeNoExecution: React.ElementType = memo(({ className, children }:
     return <CodeBlock lang={lang ?? 'text'} codeChildren={children} allowExecution={false} />;
   }
 });
+codeNoExecution.displayName = 'MarkdownCodeNoExecution';
 
 type TAnchorProps = {
   href: string;
   children: React.ReactNode;
 };
 
-export const a: React.ElementType = memo(({ href, children }: TAnchorProps) => {
+export const a: React.ElementType = memo(function MarkdownAnchor({ href, children }: TAnchorProps) {
   const user = useRecoilValue(store.user);
   const { showToast } = useToastContext();
   const localize = useLocalize();
@@ -163,46 +171,16 @@ export const a: React.ElementType = memo(({ href, children }: TAnchorProps) => {
     </a>
   );
 });
+a.displayName = 'MarkdownAnchor';
 
 type TParagraphProps = {
   children: React.ReactNode;
 };
 
-export const p: React.ElementType = memo(({ children }: TParagraphProps) => {
-  const { isCharacterMessage } = useMessageContext();
-
-  if (!isCharacterMessage) {
-    return <p className="mb-2 whitespace-pre-wrap">{children}</p>;
-  }
-
-  const processDialogue = (child: React.ReactNode): React.ReactNode => {
-    if (typeof child !== 'string') return child;
-    const parts: React.ReactNode[] = [];
-    let remaining = child;
-    let key = 0;
-    const quoteRe = /("(?:[^"\\]|\\.)*")/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = quoteRe.exec(remaining)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(remaining.slice(lastIndex, match.index));
-      }
-      parts.push(
-        <span key={key++} className="dialogue">
-          {match[1]}
-        </span>,
-      );
-      lastIndex = match.index + match[1].length;
-    }
-    if (lastIndex < remaining.length) {
-      parts.push(remaining.slice(lastIndex));
-    }
-    return parts.length > 0 ? parts : child;
-  };
-
-  const processedChildren = React.Children.map(children, processDialogue);
-  return <p className="mb-2 whitespace-pre-wrap">{processedChildren}</p>;
+export const p: React.ElementType = memo(function MarkdownParagraph({ children }: TParagraphProps) {
+  return <p className="mb-2 whitespace-pre-wrap">{children}</p>;
 });
+p.displayName = 'MarkdownParagraph';
 
 type TImageProps = {
   src?: string;
@@ -212,7 +190,13 @@ type TImageProps = {
   style?: React.CSSProperties;
 };
 
-export const img: React.ElementType = memo(({ src, alt, title, className, style }: TImageProps) => {
+export const img: React.ElementType = memo(function MarkdownImage({
+  src,
+  alt,
+  title,
+  className,
+  style,
+}: TImageProps) {
   // Get the base URL from the API endpoints
   const baseURL = apiBaseUrl();
 
@@ -231,3 +215,4 @@ export const img: React.ElementType = memo(({ src, alt, title, className, style 
 
   return <img src={fixedSrc} alt={alt} title={title} className={className} style={style} />;
 });
+img.displayName = 'MarkdownImage';

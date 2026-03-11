@@ -56,6 +56,7 @@ export async function loadDefaultInterface({
     suggestions: interfaceConfig?.suggestions,
     peoplePicker: interfaceConfig?.peoplePicker,
     marketplace: interfaceConfig?.marketplace,
+    remoteAgents: interfaceConfig?.remoteAgents,
   });
 
   return loadedInterface;

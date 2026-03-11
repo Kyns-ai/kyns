@@ -1,25 +1,17 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
-import {
-  ContentTypes,
-  dataService,
-  extractSuggestions,
-  type TMessageContentParts,
-} from 'librechat-data-provider';
+import type { TMessageContentParts } from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon } from '~/common';
-import { useMessageHelpers, useLocalize, useAttachments, useContentMetadata, useSubmitMessage } from '~/hooks';
-import { useGetStartupConfig } from '~/data-provider';
-import SuggestionChips from '~/components/Chat/Messages/Content/Parts/SuggestionChips';
+import { useMessageHelpers, useLocalize, useAttachments, useContentMetadata } from '~/hooks';
 import MessageIcon from '~/components/Chat/Messages/MessageIcon';
-import AvatarLightbox from '~/components/Chat/Messages/AvatarLightbox';
 import ContentParts from './Content/ContentParts';
 import { fontSizeAtom } from '~/store/fontSize';
 import SiblingSwitch from './SiblingSwitch';
 import MultiMessage from './MultiMessage';
 import HoverButtons from './HoverButtons';
 import SubRow from './SubRow';
-import { cn, getMessageAriaLabel, getAgentAvatarUrl } from '~/utils';
+import { cn, getMessageAriaLabel } from '~/utils';
 import store from '~/store';
 
 export default function Message(props: TMessageProps) {
@@ -40,7 +32,7 @@ export default function Message(props: TMessageProps) {
     handleScroll,
     conversation,
     isSubmitting,
-    latestMessage,
+    latestMessageId,
     handleContinue,
     copyToClipboard,
     regenerateMessage,
@@ -84,55 +76,6 @@ export default function Message(props: TMessageProps) {
   );
 
   const { hasParallelContent } = useContentMetadata(message);
-  const showResponseTimer = useMemo(
-    () => !!conversation?.endpoint && !message.isCreatedByUser,
-    [conversation?.endpoint, message?.isCreatedByUser],
-  );
-  const showSuggestions = useRecoilValue(store.showSuggestions);
-  const { data: startupConfig } = useGetStartupConfig();
-  const adminSuggestionsEnabled = startupConfig?.interface?.suggestions !== false;
-
-  const suggestions = useMemo(() => {
-    if (
-      !isLast ||
-      isSubmitting ||
-      message?.isCreatedByUser ||
-      !showSuggestions ||
-      !adminSuggestionsEnabled ||
-      !message?.content
-    ) {
-      return [];
-    }
-    const content = message.content as Array<TMessageContentParts | undefined>;
-    for (let i = content.length - 1; i >= 0; i--) {
-      const part = content[i];
-      if (!part || part.type !== ContentTypes.TEXT) {
-        continue;
-      }
-      const rawText = typeof part.text === 'string' ? part.text : part.text?.value;
-      if (typeof rawText !== 'string') {
-        continue;
-      }
-      const { suggestions: extracted } = extractSuggestions(rawText);
-      if (extracted.length > 0) {
-        return extracted;
-      }
-    }
-    return [];
-  }, [isLast, isSubmitting, message?.isCreatedByUser, message?.content, showSuggestions, adminSuggestionsEnabled]);
-
-  const { submitMessage } = useSubmitMessage();
-  const handleSuggestionClick = useCallback(
-    (text: string) => {
-      submitMessage({ text });
-      dataService.logSuggestionClick({
-        text,
-        endpoint: conversation?.endpoint ?? '',
-        conversationId: conversation?.conversationId ?? '',
-      });
-    },
-    [submitMessage, conversation?.endpoint, conversation?.conversationId],
-  );
 
   if (!message) {
     return null;
@@ -168,19 +111,9 @@ export default function Message(props: TMessageProps) {
           >
             {!hasParallelContent && (
               <div className="relative flex flex-shrink-0 flex-col items-center">
-                <AvatarLightbox
-                  avatarUrl={getAgentAvatarUrl(agent)}
-                  alt={agent?.name ? `${agent.name} avatar` : 'Agent avatar'}
-                >
-                  <div
-                    className={cn(
-                      'flex items-center justify-center overflow-hidden rounded-full pt-0.5',
-                      agent ? 'h-10 w-10' : 'h-6 w-6',
-                    )}
-                  >
-                    <MessageIcon iconData={iconData} assistant={assistant} agent={agent} />
-                  </div>
-                </AvatarLightbox>
+                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full pt-0.5">
+                  <MessageIcon iconData={iconData} assistant={assistant} agent={agent} />
+                </div>
               </div>
             )}
             <div
@@ -196,7 +129,7 @@ export default function Message(props: TMessageProps) {
                 </h2>
               )}
               <div className="flex flex-col gap-1">
-                <div className="flex max-w-full flex-grow flex-col gap-0">
+                <div className="flex min-h-[20px] max-w-full flex-grow flex-col gap-0">
                   <ContentParts
                     edit={edit}
                     isLast={isLast}
@@ -209,19 +142,12 @@ export default function Message(props: TMessageProps) {
                     setSiblingIdx={setSiblingIdx}
                     isCreatedByUser={message.isCreatedByUser}
                     conversationId={conversation?.conversationId}
-                    isLatestMessage={messageId === latestMessage?.messageId}
-                    showResponseTimer={showResponseTimer}
+                    isLatestMessage={messageId === latestMessageId}
                     content={message.content as Array<TMessageContentParts | undefined>}
                   />
                 </div>
-                {suggestions.length > 0 && (
-                  <SuggestionChips
-                    suggestions={suggestions}
-                    onSuggestionClick={handleSuggestionClick}
-                  />
-                )}
                 {isLast && isSubmitting ? (
-                  <div className="mt-1 h-[27px] bg-transparent" />
+                  <div className="mt-1 h-[31px] bg-transparent" />
                 ) : (
                   <SubRow classes="text-xs">
                     <SiblingSwitch
@@ -239,9 +165,8 @@ export default function Message(props: TMessageProps) {
                       regenerate={() => regenerateMessage()}
                       copyToClipboard={copyToClipboard}
                       handleContinue={handleContinue}
-                      latestMessage={latestMessage}
+                      latestMessageId={latestMessageId}
                       isLast={isLast}
-                      agentVoice={agent?.voice ?? undefined}
                     />
                   </SubRow>
                 )}

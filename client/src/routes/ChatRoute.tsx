@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { useRecoilCallback, useRecoilValue } from 'recoil';
 import { Spinner, useToastContext } from '@librechat/client';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Constants, EModelEndpoint } from 'librechat-data-provider';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
 import type { TPreset } from 'librechat-data-provider';
@@ -13,7 +13,13 @@ import {
   useLocalize,
 } from '~/hooks';
 import { useGetConvoIdQuery, useGetStartupConfig, useGetEndpointsQuery } from '~/data-provider';
-import { getDefaultModelSpec, getModelSpecPreset, logger, isNotFoundError } from '~/utils';
+import {
+  getDefaultModelSpec,
+  getModelSpecPreset,
+  processValidSettings,
+  logger,
+  isNotFoundError,
+} from '~/utils';
 import { ToolCallsMapProvider } from '~/Providers';
 import ChatView from '~/components/Chat/ChatView';
 import { NotificationSeverity } from '~/common';
@@ -36,12 +42,11 @@ export default function ChatRoute() {
   useAppStartup({ startupConfig, user });
 
   const index = 0;
+  const [searchParams] = useSearchParams();
   const { conversationId = '' } = useParams();
-  const location = useLocation();
   useIdChangeEffect(conversationId);
   const { hasSetConversation, conversation } = store.useCreateConversationAtom(index);
   const { newConversation } = useNewConvo();
-  const agentNavHandledRef = useRef<string | null>(null);
   const { showToast } = useToastContext();
   const localize = useLocalize();
 
@@ -68,38 +73,6 @@ export default function ChatRoute() {
     }
   }, [conversationId, isTemporaryChat, setIsTemporary, defaultTemporaryChat]);
 
-  /** Dedicated effect for agent card navigation: fires when conversationId changes to NEW_CONVO
-   *  and location.state contains an agentId. Bypasses hasSetConversation to ensure agent chat
-   *  is set up even if the user was already in a conversation.
-   */
-  useEffect(() => {
-    if (conversationId !== Constants.NEW_CONVO) return;
-    if (!modelsQuery.data || !endpointsQuery.data) return;
-
-    const agentId = (location.state as { agentId?: string } | null)?.agentId;
-    if (!agentId) return;
-    if (agentNavHandledRef.current === location.key) return;
-
-    agentNavHandledRef.current = location.key;
-    hasSetConversation.current = false;
-    logger.log('conversation', 'ChatRoute: agent card navigation', { agentId });
-    newConversation({
-      modelsData: modelsQuery.data,
-      template: {
-        ...(conversation ?? {}),
-        endpoint: EModelEndpoint.agents,
-        agent_id: agentId,
-        conversationId: Constants.NEW_CONVO,
-      },
-      preset: {
-        endpoint: EModelEndpoint.agents,
-        agent_id: agentId,
-      },
-    });
-    hasSetConversation.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, location.state, modelsQuery.data, endpointsQuery.data]);
-
   /** This effect is mainly for the first conversation state change on first load of the page.
    *  Adjusting this may have unintended consequences on the conversation state.
    */
@@ -114,14 +87,34 @@ export default function ChatRoute() {
       return;
     }
 
-    if (conversationId === Constants.NEW_CONVO && endpointsQuery.data && modelsQuery.data) {
+    const isNewConvo = conversationId === Constants.NEW_CONVO;
+
+    const getNewConvoPreset = () => {
       const result = getDefaultModelSpec(startupConfig);
       const spec = result?.default ?? result?.last;
+      const specPreset = spec ? getModelSpecPreset(spec) : undefined;
+
+      const queryParams: Record<string, string> = {};
+      searchParams.forEach((value, key) => {
+        if (key !== 'prompt' && key !== 'q' && key !== 'submit') {
+          queryParams[key] = value;
+        }
+      });
+      const querySettings = processValidSettings(queryParams);
+
+      return Object.keys(querySettings).length > 0
+        ? { ...specPreset, ...querySettings }
+        : specPreset;
+    };
+
+    if (isNewConvo && endpointsQuery.data && modelsQuery.data) {
+      const preset = getNewConvoPreset();
+
       logger.log('conversation', 'ChatRoute, new convo effect', conversation);
       newConversation({
         modelsData: modelsQuery.data,
         template: conversation ? conversation : undefined,
-        ...(spec ? { preset: getModelSpecPreset(spec) } : {}),
+        ...(preset ? { preset } : {}),
       });
 
       hasSetConversation.current = true;
@@ -159,17 +152,17 @@ export default function ChatRoute() {
       });
       hasSetConversation.current = true;
     } else if (
-      conversationId === Constants.NEW_CONVO &&
+      isNewConvo &&
       assistantListMap[EModelEndpoint.assistants] &&
       assistantListMap[EModelEndpoint.azureAssistants]
     ) {
-      const result = getDefaultModelSpec(startupConfig);
-      const spec = result?.default ?? result?.last;
+      const preset = getNewConvoPreset();
+
       logger.log('conversation', 'ChatRoute new convo, assistants effect', conversation);
       newConversation({
         modelsData: modelsQuery.data,
         template: conversation ? conversation : undefined,
-        ...(spec ? { preset: getModelSpecPreset(spec) } : {}),
+        ...(preset ? { preset } : {}),
       });
       hasSetConversation.current = true;
     } else if (
