@@ -322,9 +322,7 @@ webSearch:
   firecrawlApiUrl: "${FIRECRAWL_API_URL}"
   firecrawlOptions:
     formats: ["markdown"]
-    onlyMainContent: true
-    blockAds: true
-    removeBase64Images: true
+    excludeTags: ["nav", "footer", "header", ".ads", ".cookie", ".banner"]
     timeout: 15000
     waitFor: 2000
   scraperTimeout: 45000
