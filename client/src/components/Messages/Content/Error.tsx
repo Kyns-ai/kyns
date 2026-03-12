@@ -120,11 +120,16 @@ const errorMessages = {
 const Error = ({ text }: { text: string }) => {
   const localize = useLocalize();
   const jsonString = extractJson(text);
-  const errorMessage = text.length > 512 && !jsonString ? text.slice(0, 512) + '...' : text;
-  const defaultResponse = `Something went wrong. Here's the specific error message we encountered: ${errorMessage}`;
 
   if (!isJson(jsonString)) {
-    return defaultResponse;
+    return (
+      <div>
+        <p style={{ fontWeight: 'bold', marginBottom: '6px' }}>Erro:</p>
+        <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '13px' }}>
+          {text}
+        </code>
+      </div>
+    );
   }
 
   const json = JSON.parse(jsonString);
@@ -133,13 +138,20 @@ const Error = ({ text }: { text: string }) => {
 
   if (keyExists && typeof errorMessages[errorKey] === 'function') {
     return errorMessages[errorKey](json, localize);
-  } else if (keyExists && keyExists.startsWith(localizedErrorPrefix)) {
-    return localize(errorMessages[errorKey]);
+  } else if (keyExists && typeof keyExists === 'string' && keyExists.startsWith(localizedErrorPrefix)) {
+    return localize(errorMessages[errorKey] as string);
   } else if (keyExists) {
-    return errorMessages[errorKey];
-  } else {
-    return defaultResponse;
+    return errorMessages[errorKey] as string;
   }
+
+  return (
+    <div>
+      <p style={{ fontWeight: 'bold', marginBottom: '6px' }}>Erro:</p>
+      <code style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '13px' }}>
+        {JSON.stringify(json, null, 2)}
+      </code>
+    </div>
+  );
 };
 
 export default Error;

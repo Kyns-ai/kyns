@@ -60,6 +60,31 @@ const DEFAULT_AGENT_RECURSION_LIMIT = 16;
 const MEMORY_CONTEXT_TIMEOUT_MS = 1500;
 const SLOW_STAGE_THRESHOLD_MS = 200;
 
+function sanitizePayload(payload) {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+  const result = [];
+  for (const msg of payload) {
+    if (msg == null || typeof msg !== 'object') {
+      continue;
+    }
+    if (!msg.role) {
+      const inferred =
+        msg.sender?.toLowerCase() === 'user'
+          ? 'user'
+          : msg.isCreatedByUser
+            ? 'user'
+            : msg.lc_id?.[2] === 'SystemMessage'
+              ? 'system'
+              : 'assistant';
+      msg.role = inferred;
+    }
+    result.push(msg);
+  }
+  return result;
+}
+
 class AgentClient extends BaseClient {
   constructor(options = {}) {
     super(null, options);
@@ -801,9 +826,10 @@ class AgentClient extends BaseClient {
         version: 'v2',
       };
 
+      payload = sanitizePayload(payload);
       const toolSet = buildToolSet(this.options.agent);
       let { messages: initialMessages, indexTokenCountMap } = formatAgentMessages(
-        payload.filter(Boolean),
+        payload,
         this.indexTokenCountMap,
         toolSet,
       );
@@ -929,9 +955,18 @@ class AgentClient extends BaseClient {
           '[api/server/controllers/agents/client.js #sendCompletion] Unhandled error type',
           err,
         );
+        const rawMsg = err?.message ?? '';
+        const stackHint = err?.stack
+          ? '\n' + err.stack.split('\n').slice(0, 4).join('\n')
+          : '';
+        const isConnectionError =
+          /Connection error|terminated|ECONNREFUSED|ECONNRESET|fetch failed|ETIMEDOUT/i.test(rawMsg);
+        const userMessage = isConnectionError
+          ? 'Falha de conexão com o servidor. Pode ser temporário — tente novamente em alguns instantes.'
+          : `${rawMsg || 'Unknown error'}${stackHint}`;
         this.contentParts.push({
           type: ContentTypes.ERROR,
-          [ContentTypes.ERROR]: `An error occurred while processing the request${err?.message ? `: ${err.message}` : ''}`,
+          [ContentTypes.ERROR]: userMessage,
         });
       }
     } finally {
