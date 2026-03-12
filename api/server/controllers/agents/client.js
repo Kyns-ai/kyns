@@ -127,26 +127,6 @@ function appendTextToMessageContent(content, text) {
   return text;
 }
 
-function normalizeMessageText(content) {
-  if (typeof content === 'string') {
-    return content;
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (part?.type === ContentTypes.TEXT) {
-          return part.text ?? '';
-        }
-        return '';
-      })
-      .filter(Boolean)
-      .join('\n');
-  }
-
-  return '';
-}
-
 class AgentClient extends BaseClient {
   constructor(options = {}) {
     super(null, options);
@@ -272,6 +252,28 @@ class AgentClient extends BaseClient {
   }
 
   async buildMessages(messages, parentMessageId, _buildOptions, opts) {
+    if (this.isKynsImageEndpoint()) {
+      const orderedMessages = this.constructor.getMessagesForConversation({
+        messages,
+        parentMessageId,
+      });
+
+      for (let i = 0; i < orderedMessages.length; i++) {
+        this.indexTokenCountMap[i] = orderedMessages[i].tokenCount ?? 0;
+      }
+
+      if (typeof opts?.getReqData === 'function') {
+        opts.getReqData({ promptTokens: 0 });
+      }
+
+      return {
+        prompt: [],
+        promptTokens: 0,
+        tokenCountMap: undefined,
+        messages: orderedMessages,
+      };
+    }
+
     /** Always pass mapMethod; getMessagesForConversation applies it only to messages with addedConvo flag */
     const orderedMessages = this.constructor.getMessagesForConversation({
       messages,
@@ -855,22 +857,28 @@ class AgentClient extends BaseClient {
   }
 
   isKynsImageEndpoint() {
-    return this.options.endpoint === 'KYNSImage' || this.options.req.body?.endpoint === 'KYNSImage';
+    const endpoint = this.options.endpoint;
+    const bodyEndpoint = this.options.req?.body?.endpoint;
+    const bodyEndpointOption = this.options.req?.body?.endpointOption?.endpoint;
+    return (
+      endpoint === 'KYNSImage' || bodyEndpoint === 'KYNSImage' || bodyEndpointOption === 'KYNSImage'
+    );
   }
 
-  async handleDirectKynsImage(payload, abortController) {
-    const messages = Array.isArray(payload)
-      ? payload
-          .filter(Boolean)
-          .map((message) => ({
-            role:
-              message.role ??
-              (message.isCreatedByUser === true ? 'user' : 'assistant'),
-            content: normalizeMessageText(message.content ?? message.text ?? ''),
-          }))
-      : [];
+  async executeKynsImageRequest() {
+    const body = this.options.req?.body ?? {};
+    const userText = body.text ?? '';
+    if (!userText.trim()) {
+      return 'Por favor, descreva a imagem que deseja gerar.';
+    }
 
     const port = process.env.PORT || 3080;
+    const model =
+      body.model ??
+      body.endpointOption?.model_parameters?.model ??
+      body.endpointOption?.model ??
+      'lustify';
+
     const response = await fetch(`http://127.0.0.1:${port}/api/image-proxy/chat/completions`, {
       method: 'POST',
       headers: {
@@ -878,27 +886,43 @@ class AgentClient extends BaseClient {
         Authorization: 'Bearer kyns-image-internal',
       },
       body: JSON.stringify({
-        messages,
-        model: this.options.req.body?.model,
+        messages: [{ role: 'user', content: userText }],
+        model,
       }),
-      signal: abortController?.signal,
     });
 
-    const data = await response.json().catch(() => null);
-    const messageContent = data?.choices?.[0]?.message?.content;
-
-    if (typeof messageContent !== 'string' || messageContent.length === 0) {
-      throw new Error('Resposta inválida do servidor de imagem.');
+    if (!response.ok) {
+      logger.error(`[KYNSImage] imageProxy returned ${response.status}`);
+      return 'Erro ao gerar imagem. Tente novamente.';
     }
 
-    this.contentParts.push({
-      type: ContentTypes.TEXT,
-      text: messageContent,
-    });
+    const data = await response.json().catch(() => null);
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content === 'string' && content.length > 0) {
+      return content;
+    }
+
+    logger.error('[KYNSImage] Unexpected response from imageProxy:', data);
+    return 'Erro ao gerar imagem. Tente novamente.';
   }
 
   /** @type {sendCompletion} */
   async sendCompletion(payload, opts = {}) {
+    if (this.isKynsImageEndpoint()) {
+      try {
+        const imageContent = await this.executeKynsImageRequest();
+        this.contentParts.push({ type: ContentTypes.TEXT, text: imageContent });
+      } catch (err) {
+        logger.error('[KYNSImage] Error in executeKynsImageRequest:', err);
+        this.contentParts.push({
+          type: ContentTypes.ERROR,
+          [ContentTypes.ERROR]: `Erro ao gerar imagem: ${err?.message ?? 'erro desconhecido'}`,
+        });
+      }
+      const completion = filterMalformedContentParts(this.contentParts);
+      return { completion };
+    }
+
     await this.chatCompletion({
       payload,
       onProgress: opts.onProgress,
@@ -1017,11 +1041,6 @@ class AgentClient extends BaseClient {
     try {
       if (!abortController) {
         abortController = new AbortController();
-      }
-
-      if (this.isKynsImageEndpoint()) {
-        await this.handleDirectKynsImage(payload, abortController);
-        return;
       }
 
       /** @type {AppConfig['endpoints']['agents']} */
