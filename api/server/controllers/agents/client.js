@@ -908,16 +908,9 @@ class AgentClient extends BaseClient {
     }
 
     const port = process.env.PORT || 3080;
-    const agentModel = this.options.agent?.model_parameters?.model;
-    const agentTopModel = this.options.agent?.model;
-    const bodyEpModel = body.endpointOption?.model_parameters?.model;
-    const bodyModel = body.model;
-    const thisModel = this.model;
-    logger.info(
-      `[KYNSImage] Model candidates: agentMP=${agentModel}, agentModel=${agentTopModel}, bodyEp=${bodyEpModel}, body=${bodyModel}, this=${thisModel}`,
-    );
-    const model = agentModel ?? agentTopModel ?? bodyEpModel ?? bodyModel ?? thisModel ?? 'lustify';
-    logger.info(`[KYNSImage] Model resolved: ${model}`);
+    const spec = this.options.spec ?? body.spec ?? '';
+    const model = spec.includes('turbo') ? 'zimage' : 'lustify';
+    logger.info(`[KYNSImage] spec=${spec} → model=${model}`);
 
     const response = await fetch(`http://127.0.0.1:${port}/api/image-proxy/chat/completions`, {
       method: 'POST',
