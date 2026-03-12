@@ -66,6 +66,31 @@ const MEMORY_CONTEXT_TIMEOUT_MS = 1500;
 const SLOW_STAGE_THRESHOLD_MS = 200;
 const MANUAL_WEB_SEARCH_TOOL_ID = 'manual-web-search';
 
+function sanitizePayload(payload) {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+  const result = [];
+  for (const msg of payload) {
+    if (msg == null || typeof msg !== 'object') {
+      continue;
+    }
+    if (!msg.role) {
+      const inferred =
+        msg.sender?.toLowerCase() === 'user'
+          ? 'user'
+          : msg.isCreatedByUser
+            ? 'user'
+            : msg.lc_id?.[2] === 'SystemMessage'
+              ? 'system'
+              : 'assistant';
+      msg.role = inferred;
+    }
+    result.push(msg);
+  }
+  return result;
+}
+
 function normalizeToolContent(result) {
   if (result == null) {
     return '';
@@ -776,84 +801,90 @@ class AgentClient extends BaseClient {
       return payload;
     }
 
-    const auth = await loadWebSearchAuth({
-      userId: this.options.req.user.id,
-      webSearchConfig,
-      loadAuthValues,
-      throwError: false,
-    });
+    try {
+      const auth = await loadWebSearchAuth({
+        userId: this.options.req.user.id,
+        webSearchConfig,
+        loadAuthValues,
+        throwError: false,
+      });
 
-    if (!isWebSearchSufficientlyAuthenticated(auth)) {
-      return payload;
-    }
-
-    let targetIndex = -1;
-    for (let i = payload.length - 1; i >= 0; i--) {
-      if (payload[i]?.role === 'user') {
-        targetIndex = i;
-        break;
+      if (!isWebSearchSufficientlyAuthenticated(auth)) {
+        logger.warn('[prepareManualWebSearch] Web search auth insufficient, skipping');
+        return payload;
       }
-    }
 
-    if (targetIndex === -1) {
-      return payload;
-    }
+      let targetIndex = -1;
+      for (let i = payload.length - 1; i >= 0; i--) {
+        if (payload[i]?.role === 'user') {
+          targetIndex = i;
+          break;
+        }
+      }
 
-    const targetMessage = payload[targetIndex];
-    const query =
-      typeof targetMessage?.content === 'string'
-        ? targetMessage.content
-        : targetMessage?.text ?? this.options.req.body?.text ?? '';
+      if (targetIndex === -1) {
+        return payload;
+      }
 
-    if (!query.trim()) {
-      return payload;
-    }
+      const targetMessage = payload[targetIndex];
+      const query =
+        typeof targetMessage?.content === 'string'
+          ? targetMessage.content
+          : targetMessage?.text ?? this.options.req.body?.text ?? '';
 
-    const searchTool = createSearchTool({
-      ...auth.authResult,
-      logger,
-    });
-    const rawResult = await searchTool.invoke({ query: query.trim() });
-    const { content, artifact } = normalizeToolResult(rawResult);
-    const normalizedContent =
-      typeof content === 'string'
-        ? content
-        : Array.isArray(content)
+      if (!query.trim()) {
+        return payload;
+      }
+
+      const searchTool = createSearchTool({
+        ...auth.authResult,
+        logger,
+      });
+      const rawResult = await searchTool.invoke({ query: query.trim() });
+      const { content, artifact } = normalizeToolResult(rawResult);
+      const normalizedContent =
+        typeof content === 'string'
           ? content
-              .map((part) => (part?.type === ContentTypes.TEXT ? part.text ?? '' : ''))
-              .filter(Boolean)
-              .join('\n')
-          : normalizeToolContent(content);
+          : Array.isArray(content)
+            ? content
+                .map((part) => (part?.type === ContentTypes.TEXT ? part.text ?? '' : ''))
+                .filter(Boolean)
+                .join('\n')
+            : normalizeToolContent(content);
 
-    if (!normalizedContent.trim()) {
+      if (!normalizedContent.trim()) {
+        return payload;
+      }
+
+      const nextPayload = [...payload];
+      nextPayload[targetIndex] = {
+        ...targetMessage,
+        role: targetMessage?.role ?? 'user',
+        content: appendTextToMessageContent(
+          targetMessage?.content ?? targetMessage?.text ?? '',
+          `Web search context:\n${normalizedContent}`,
+        ),
+      };
+
+      const searchData = artifact?.[Tools.web_search];
+      if (searchData) {
+        this.artifactPromises.push(
+          Promise.resolve({
+            type: Tools.web_search,
+            messageId: this.responseMessageId,
+            toolCallId: MANUAL_WEB_SEARCH_TOOL_ID,
+            conversationId: this.conversationId,
+            [Tools.web_search]: searchData,
+          }),
+        );
+      }
+
+      this.removeToolFromAgentConfig(Tools.web_search);
+      return nextPayload.filter(Boolean);
+    } catch (err) {
+      logger.error('[prepareManualWebSearch] Web search failed, proceeding without search:', err);
       return payload;
     }
-
-    const nextPayload = [...payload];
-    nextPayload[targetIndex] = {
-      ...targetMessage,
-      role: targetMessage?.role ?? 'user',
-      content: appendTextToMessageContent(
-        targetMessage?.content ?? targetMessage?.text ?? '',
-        `Web search context:\n${normalizedContent}`,
-      ),
-    };
-
-    const searchData = artifact?.[Tools.web_search];
-    if (searchData) {
-      this.artifactPromises.push(
-        Promise.resolve({
-          type: Tools.web_search,
-          messageId: this.responseMessageId,
-          toolCallId: MANUAL_WEB_SEARCH_TOOL_ID,
-          conversationId: this.conversationId,
-          [Tools.web_search]: searchData,
-        }),
-      );
-    }
-
-    this.removeToolFromAgentConfig(Tools.web_search);
-    return nextPayload.filter(Boolean);
   }
 
   isKynsImageEndpoint() {
@@ -1067,9 +1098,10 @@ class AgentClient extends BaseClient {
       };
 
       payload = await this.prepareManualWebSearch(payload);
+      payload = sanitizePayload(payload);
       const toolSet = buildToolSet(this.options.agent);
       let { messages: initialMessages, indexTokenCountMap } = formatAgentMessages(
-        payload.filter(Boolean),
+        payload,
         this.indexTokenCountMap,
         toolSet,
       );
@@ -1196,11 +1228,14 @@ class AgentClient extends BaseClient {
           err,
         );
         const rawMsg = err?.message ?? '';
+        const stackHint = err?.stack
+          ? '\n' + err.stack.split('\n').slice(0, 4).join('\n')
+          : '';
         const isConnectionError =
           /Connection error|terminated|ECONNREFUSED|ECONNRESET|fetch failed|ETIMEDOUT/i.test(rawMsg);
         const userMessage = isConnectionError
           ? 'Falha de conexão com o servidor. Pode ser temporário — tente novamente em alguns instantes.'
-          : `An error occurred while processing the request${rawMsg ? `: ${rawMsg}` : ''}`;
+          : `${rawMsg || 'Unknown error'}${stackHint}`;
         this.contentParts.push({
           type: ContentTypes.ERROR,
           [ContentTypes.ERROR]: userMessage,
