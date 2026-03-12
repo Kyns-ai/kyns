@@ -102,7 +102,7 @@ function parseImageRequest(messages, requestedModel) {
     width,
     height,
     steps: isZimage ? 9 : 4,
-    cfg_scale: isZimage ? 0.0 : 1.0,
+    cfg_scale: isZimage ? 0.0 : 3.5,
   };
 }
 
