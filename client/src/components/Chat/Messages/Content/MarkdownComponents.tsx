@@ -1,14 +1,15 @@
-import React, { memo, useMemo, useRef, useEffect, useState } from 'react';
+import React, { memo, useMemo, useRef, useEffect } from 'react';
 import { useRecoilValue } from 'recoil';
 import { useToastContext } from '@librechat/client';
 import { PermissionTypes, Permissions, apiBaseUrl } from 'librechat-data-provider';
 import MermaidErrorBoundary from '~/components/Messages/Content/MermaidErrorBoundary';
 import CodeBlock from '~/components/Messages/Content/CodeBlock';
 import Mermaid from '~/components/Messages/Content/Mermaid';
+import Image from './Image';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
 import { useFileDownload } from '~/data-provider';
 import { useCodeBlockContext } from '~/Providers';
-import { cn, handleDoubleClick } from '~/utils';
+import { handleDoubleClick } from '~/utils';
 import { useLocalize } from '~/hooks';
 import store from '~/store';
 
@@ -199,7 +200,6 @@ export const img: React.ElementType = memo(function MarkdownImage({
   className,
   style,
 }: TImageProps) {
-  const [loaded, setLoaded] = useState(false);
   const baseURL = apiBaseUrl();
 
   const fixedSrc = useMemo(() => {
@@ -220,29 +220,11 @@ export const img: React.ElementType = memo(function MarkdownImage({
   }
 
   return (
-    <div className="relative mt-1 w-full max-w-lg overflow-hidden rounded-lg">
-      {!loaded && (
-        <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-surface-secondary">
-          <div className="flex flex-col items-center gap-3">
-            <div className="size-8 animate-spin rounded-full border-2 border-border-medium border-t-text-primary" />
-            <span className="text-sm text-text-secondary">Gerando imagem…</span>
-          </div>
-        </div>
-      )}
-      <img
-        src={fixedSrc}
-        alt={alt}
-        title={title}
-        onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
-        className={cn(
-          'w-full rounded-lg transition-all duration-700 ease-out',
-          loaded ? 'opacity-100 blur-0' : 'h-0 opacity-0 blur-md',
-          className,
-        )}
-        style={style}
-      />
-    </div>
+    <Image
+      imagePath={fixedSrc ?? ''}
+      altText={alt || title || 'generated image'}
+      className={className}
+    />
   );
 });
 img.displayName = 'MarkdownImage';

@@ -3,9 +3,10 @@
 # Base node image
 FROM node:20-alpine AS node
 
-# Install jemalloc
-RUN apk add --no-cache jemalloc su-exec
+# Install runtime libraries and fonts used by sharp/libvips SVG text rendering
+RUN apk add --no-cache jemalloc su-exec fontconfig ttf-dejavu
 RUN apk add --no-cache python3 py3-pip uv
+RUN fc-cache -f
 
 # Set environment variable to use jemalloc
 ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2

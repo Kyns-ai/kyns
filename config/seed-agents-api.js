@@ -59,6 +59,7 @@ function buildAgentBody(item) {
     tool_resources: item.tool_resources ?? undefined,
     tool_options: item.tool_options ?? undefined,
     agent_ids: item.agent_ids,
+    voice: item.voice ?? undefined,
   };
   return Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
 }

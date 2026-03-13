@@ -2,6 +2,7 @@ const express = require('express');
 const { generateCheckAccess, skipAgentCheck } = require('@librechat/api');
 const { PermissionTypes, Permissions, PermissionBits } = require('librechat-data-provider');
 const {
+  kynsSafetyText,
   moderateText,
   // validateModel,
   validateConvoAccess,
@@ -25,6 +26,7 @@ const checkAgentResourceAccess = canAccessAgentFromBody({
   requiredPermission: PermissionBits.VIEW,
 });
 
+router.use(kynsSafetyText);
 router.use(moderateText);
 router.use(checkAgentAccess);
 router.use(checkAgentResourceAccess);

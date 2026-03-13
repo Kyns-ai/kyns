@@ -14,7 +14,7 @@ import type {
   ToolEndData,
   LLMConfig,
 } from '@librechat/agents';
-import type { ObjectId, MemoryMethods, IUser } from '@librechat/data-schemas';
+import type { ObjectId, MemoryMethods, IUser, MemoryScope } from '@librechat/data-schemas';
 import type { TAttachment, MemoryArtifact } from 'librechat-data-provider';
 import type { BaseMessage, ToolMessage } from '@langchain/core/messages';
 import type { Response as ServerResponse } from 'express';
@@ -44,33 +44,36 @@ export const memoryInstructions =
 const getDefaultInstructions = (
   validKeys?: string[],
   tokenLimit?: number,
-) => `Use the \`set_memory\` tool to save important information about the user, but ONLY when the user has requested you to remember something.
+  agentName?: string,
+) => `You maintain long-term memory about the user${agentName ? ` for the character "${agentName}"` : ''}.
 
-The \`delete_memory\` tool should only be used in two scenarios:
-  1. When the user explicitly asks to forget or remove specific information
-  2. When updating existing memories, use the \`set_memory\` tool instead of deleting and re-adding the memory.
+Use the \`set_memory\` tool to save durable information that will likely improve future conversations.
 
-1. ONLY use memory tools when the user requests memory actions with phrases like:
-   - "Remember [that] [I]..."
-   - "Don't forget [that] [I]..."
-   - "Please remember..."
-   - "Store this..."
-   - "Forget [that] [I]..."
-   - "Delete the memory about..."
+Prioritize:
+1. Stable identity facts about the user
+2. Durable preferences, tastes, habits, and boundaries
+3. Important recurring relationships, people, places, or projects
+4. Ongoing situations that are likely to matter in future chats
 
-2. NEVER store information just because the user mentioned it in conversation.
+Do NOT store:
+1. One-off trivia or disposable details
+2. Temporary requests that only matter for the current turn
+3. Information that is vague, speculative, or not clearly about the user
+4. Facts that should remain only in short-term conversation context
 
-3. NEVER use memory tools when the user asks you to use other tools or invoke tools in general.
+You MAY save memory even when the user did not explicitly say "remember this", but only when the information is clearly durable and genuinely useful later.
 
-4. Memory tools are ONLY for memory requests, not for general tool usage.
+Prefer updating an existing key with a concise current summary instead of scattering fragmented memories across many entries.
 
-5. If the user doesn't ask you to remember or forget something, DO NOT use any memory tools.
+Use the \`delete_memory\` tool only when the user explicitly asks to forget something or when a stored fact should be removed entirely instead of updated.
+
+Memory tools are ONLY for memory management, not for general tool usage.
 
 ${validKeys && validKeys.length > 0 ? `\nVALID KEYS: ${validKeys.join(', ')}` : ''}
 
 ${tokenLimit ? `\nTOKEN LIMIT: Maximum ${tokenLimit} tokens per memory value.` : ''}
 
-When in doubt, and the user hasn't asked to remember or forget anything, END THE TURN IMMEDIATELY.`;
+When storing a value, write one concise, self-contained sentence.`;
 
 /**
  * Creates a memory tool instance with user context
@@ -81,12 +84,16 @@ export const createMemoryTool = ({
   validKeys,
   tokenLimit,
   totalTokens = 0,
+  scope = 'user',
+  agentId,
 }: {
   userId: string | ObjectId;
   setMemory: MemoryMethods['setMemory'];
   validKeys?: string[];
   tokenLimit?: number;
   totalTokens?: number;
+  scope?: MemoryScope;
+  agentId?: string;
 }) => {
   const remainingTokens = tokenLimit ? tokenLimit - totalTokens : Infinity;
   const isOverflowing = tokenLimit ? remainingTokens <= 0 : false;
@@ -153,7 +160,7 @@ export const createMemoryTool = ({
           },
         };
 
-        const result = await setMemory({ userId, key, value, tokenCount });
+        const result = await setMemory({ userId, key, value, tokenCount, scope, agentId });
         if (result.ok) {
           logger.debug(`Memory set for key "${key}" (${tokenCount} tokens) for user "${userId}"`);
           return [`Memory set for key "${key}" (${tokenCount} tokens)`, artifact];
@@ -194,10 +201,14 @@ const createDeleteMemoryTool = ({
   userId,
   deleteMemory,
   validKeys,
+  scope = 'user',
+  agentId,
 }: {
   userId: string | ObjectId;
   deleteMemory: MemoryMethods['deleteMemory'];
   validKeys?: string[];
+  scope?: MemoryScope;
+  agentId?: string;
 }) => {
   return tool(
     async ({ key }) => {
@@ -218,7 +229,7 @@ const createDeleteMemoryTool = ({
           },
         };
 
-        const result = await deleteMemory({ userId, key });
+        const result = await deleteMemory({ userId, key, scope, agentId });
         if (result.ok) {
           logger.debug(`Memory deleted for key "${key}" for user "${userId}"`);
           return [`Memory deleted for key "${key}"`, artifact];
@@ -287,6 +298,8 @@ export async function processMemory({
   totalTokens = 0,
   streamId = null,
   user,
+  scope = 'user',
+  agentId,
 }: {
   res: ServerResponse;
   setMemory: MemoryMethods['setMemory'];
@@ -303,6 +316,8 @@ export async function processMemory({
   llmConfig?: Partial<LLMConfig>;
   streamId?: string | null;
   user?: IUser;
+  scope?: MemoryScope;
+  agentId?: string;
 }): Promise<(TAttachment | null)[] | undefined> {
   try {
     const memoryTool = createMemoryTool({
@@ -311,11 +326,15 @@ export async function processMemory({
       setMemory,
       validKeys,
       totalTokens,
+      scope,
+      agentId,
     });
     const deleteMemoryTool = createDeleteMemoryTool({
       userId,
       validKeys,
       deleteMemory,
+      scope,
+      agentId,
     });
 
     const currentMemoryTokens = totalTokens;
@@ -502,6 +521,8 @@ export async function createMemoryProcessor({
   config = {},
   streamId = null,
   user,
+  agentId,
+  agentName,
 }: {
   res: ServerResponse;
   messageId: string;
@@ -511,12 +532,17 @@ export async function createMemoryProcessor({
   config?: MemoryConfig;
   streamId?: string | null;
   user?: IUser;
+  agentId?: string;
+  agentName?: string;
 }): Promise<[string, (messages: BaseMessage[]) => Promise<(TAttachment | null)[] | undefined>]> {
   const { validKeys, instructions, llmConfig, tokenLimit } = config;
-  const finalInstructions = instructions || getDefaultInstructions(validKeys, tokenLimit);
+  const defaultInstructions = getDefaultInstructions(validKeys, tokenLimit, agentName);
+  const finalInstructions = [defaultInstructions, instructions].filter(Boolean).join('\n\n');
+  const scope: MemoryScope = agentId?.trim() ? 'agent' : 'user';
 
   const { withKeys, withoutKeys, totalTokens } = await memoryMethods.getFormattedMemories({
     userId,
+    agentId,
   });
 
   return [
@@ -539,6 +565,8 @@ export async function createMemoryProcessor({
           setMemory: memoryMethods.setMemory,
           deleteMemory: memoryMethods.deleteMemory,
           user,
+          scope,
+          agentId,
         });
       } catch (error) {
         logger.error('Memory Agent failed to process memory', error);

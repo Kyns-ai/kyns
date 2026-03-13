@@ -356,10 +356,18 @@ export type TExtractedThinkingSegment = {
 };
 
 const taggedThinkingPatterns = [/:::thinking\s*([\s\S]*?):::/gi, /<think>\s*([\s\S]*?)\s*<\/think>/gi];
-const leadingThinkingPattern =
-  /^(thinking process|thought process|reasoning process|thinking|reasoning):\s*/i;
-const answerHeadingPattern =
-  /(?:^|\n{2,})(final answer|answer|response|result|output|resposta final|resposta|resultado|conclus[aã]o):\s*/i;
+const markdownHeadingPrefix = String.raw`(?:\s{0,3}#{1,6}\s*)?`;
+const markdownEmphasisWrapper = String.raw`(?:\*\*|__|[*_])?`;
+const thinkingHeadingLabel = String.raw`(thinking process|thought process|reasoning process|thinking|reasoning|processo de pensamento|processo de racioc[ií]nio|pensamento|racioc[ií]nio)`;
+const answerHeadingLabel = String.raw`(final answer|answer|response|result|output|resposta final|resposta|resultado|conclus[aã]o)`;
+const leadingThinkingPattern = new RegExp(
+  String.raw`^${markdownHeadingPrefix}${markdownEmphasisWrapper}${thinkingHeadingLabel}(?::)?${markdownEmphasisWrapper}\s*:?[ \t]*\n?`,
+  'i',
+);
+const answerHeadingPattern = new RegExp(
+  String.raw`(?:^|\n{2,}|\n)${markdownHeadingPrefix}${markdownEmphasisWrapper}${answerHeadingLabel}(?::)?${markdownEmphasisWrapper}\s*:?[ \t]*\n?`,
+  'i',
+);
 
 const inlineReasoningBlockPattern =
   /^(?:Wait,|Better version|Better option|Hmm\s|Actually,|Let me reconsider|per guidelines|strict adherence|reading comprehension|based purely upon|settle this one|final decision point)/i;
@@ -577,10 +585,11 @@ export function extractThinkingContent(text: string): {
     .filter((segment) => segment.type === 'text')
     .map((segment) => segment.content)
     .join('');
+  const hasThinkingSegments = extractedSegments.some((segment) => segment.type === 'think');
   let regularContent = truncateRepetitionChain(
     normalizeExtractedContent(rawRegularContent),
   );
-  if (!regularContent.trim() && text.trim().length > 0) {
+  if (!regularContent.trim() && text.trim().length > 0 && !hasThinkingSegments) {
     regularContent = normalizeExtractedContent(text);
   }
 
@@ -858,6 +867,9 @@ const EMOJI_PATTERN =
   /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
 const MULTI_NEWLINE_PATTERN = /\n{2,}/g;
 const MULTI_SPACE_PATTERN = / {2,}/g;
+const ROLEPLAY_FORMATTING_PATTERN = /(\*[^*\n]+\*)|(_[^_\n]+_)/;
+const DOUBLE_QUOTE_DIALOGUE_PATTERN = /"([^"\n][\s\S]*?)"/g;
+const SMART_QUOTE_DIALOGUE_PATTERN = /[“”]([^“”\n][\s\S]*?)[“”]/g;
 
 /**
  * Strips markdown, thinking blocks, suggestion tags, and emoji from text
@@ -882,4 +894,42 @@ export function sanitizeTextForTTS(text: string): string {
     .replace(MULTI_NEWLINE_PATTERN, '. ')
     .replace(MULTI_SPACE_PATTERN, ' ')
     .trim();
+}
+
+/**
+ * Extracts spoken dialogue for TTS.
+ * If the text contains quoted speech, only the quoted segments are returned.
+ * Otherwise, it falls back to the fully sanitized text.
+ */
+export function extractDialogueForTTS(text: string): string {
+  const hasRoleplayFormatting = ROLEPLAY_FORMATTING_PATTERN.test(text);
+  const sanitized = sanitizeTextForTTS(text);
+  if (!sanitized) {
+    return sanitized;
+  }
+
+  const matches: string[] = [];
+  const patterns = [DOUBLE_QUOTE_DIALOGUE_PATTERN, SMART_QUOTE_DIALOGUE_PATTERN];
+
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    pattern.lastIndex = 0;
+    match = pattern.exec(sanitized);
+    while (match != null) {
+      const value = match[1]?.trim();
+      if (value) {
+        matches.push(value);
+      }
+      match = pattern.exec(sanitized);
+    }
+  }
+
+  if (matches.length === 0) {
+    if (hasRoleplayFormatting) {
+      return '';
+    }
+    return sanitized;
+  }
+
+  return matches.join(' ').replace(MULTI_SPACE_PATTERN, ' ').trim();
 }

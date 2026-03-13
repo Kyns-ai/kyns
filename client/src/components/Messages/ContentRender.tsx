@@ -3,6 +3,8 @@ import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
 import type { TMessage, TMessageContentParts } from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon } from '~/common';
+import { isKynsDeepMessage } from '~/components/Chat/Messages/Content/KynsMessageUtils';
+import { isKynsImageGeneration } from '~/components/Chat/Messages/Content/KynsImageGeneration';
 import { useAttachments, useLocalize, useMessageActions, useContentMetadata } from '~/hooks';
 import ContentParts from '~/components/Chat/Messages/Content/ContentParts';
 import PlaceholderRow from '~/components/Chat/Messages/ui/PlaceholderRow';
@@ -88,6 +90,25 @@ const ContentRender = memo(function ContentRender({
     ],
   );
 
+  const isKynsImageMessage = useMemo(
+    () =>
+      isKynsImageGeneration({
+        endpoint: msg?.endpoint ?? conversation?.endpoint,
+        model: msg?.model ?? conversation?.model,
+      }),
+    [conversation?.endpoint, conversation?.model, msg?.endpoint, msg?.model],
+  );
+  const isKynsDeepModeMessage = useMemo(
+    () =>
+      isKynsDeepMessage({
+        endpoint: msg?.endpoint ?? conversation?.endpoint,
+        spec: conversation?.spec,
+        sender: msg?.sender,
+        modelLabel: conversation?.modelLabel,
+      }),
+    [conversation?.endpoint, conversation?.modelLabel, conversation?.spec, msg?.endpoint, msg?.sender],
+  );
+
   const { hasParallelContent } = useContentMetadata(msg);
 
   if (!msg) {
@@ -157,6 +178,8 @@ const ContentRender = memo(function ContentRender({
               isLatestMessage={isLatestMessage}
               isSubmitting={effectiveIsSubmitting}
               isCreatedByUser={msg.isCreatedByUser}
+              isKynsImageMessage={isKynsImageMessage}
+              isKynsDeepMessage={isKynsDeepModeMessage}
               isCharacterMessage={!!agent && !msg.isCreatedByUser}
               conversationId={conversation?.conversationId}
               content={msg.content as Array<TMessageContentParts | undefined>}

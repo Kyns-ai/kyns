@@ -3,6 +3,7 @@ import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
 import type { TMessageContentParts } from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon } from '~/common';
+import { isKynsImageGeneration } from '~/components/Chat/Messages/Content/KynsImageGeneration';
 import { useMessageHelpers, useLocalize, useAttachments, useContentMetadata } from '~/hooks';
 import MessageIcon from '~/components/Chat/Messages/MessageIcon';
 import ContentParts from './Content/ContentParts';
@@ -75,6 +76,15 @@ export default function Message(props: TMessageProps) {
     ],
   );
 
+  const isKynsImageMessage = useMemo(
+    () =>
+      isKynsImageGeneration({
+        endpoint: message?.endpoint ?? conversation?.endpoint,
+        model: message?.model ?? conversation?.model,
+      }),
+    [conversation?.endpoint, conversation?.model, message?.endpoint, message?.model],
+  );
+
   const { hasParallelContent } = useContentMetadata(message);
 
   if (!message) {
@@ -141,6 +151,7 @@ export default function Message(props: TMessageProps) {
                     messageId={message.messageId}
                     setSiblingIdx={setSiblingIdx}
                     isCreatedByUser={message.isCreatedByUser}
+                    isKynsImageMessage={isKynsImageMessage}
                     conversationId={conversation?.conversationId}
                     isLatestMessage={messageId === latestMessageId}
                     content={message.content as Array<TMessageContentParts | undefined>}

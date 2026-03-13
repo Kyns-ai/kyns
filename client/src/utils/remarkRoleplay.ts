@@ -1,8 +1,16 @@
 import { visit } from 'unist-util-visit';
-import type { Node } from 'unist';
 
-type TextNode = Node & { value: string };
-type ParentNode = Node & { children: Node[] };
+type RoleplayNode = {
+  type: string;
+  value?: string;
+  data?: {
+    hName: string;
+    hProperties: {
+      className: string[];
+    };
+  };
+  children?: RoleplayNode[];
+};
 
 const DIALOGUE_PATTERN = '["\\u201C][^"\\u201D\\n]{1,}["\\u201D]';
 const PAREN_ACTION_PATTERN = '\\([^()\\n]{1,}\\)';
@@ -20,7 +28,12 @@ const ROLEPLAY_BOUNDARY_REGEX = new RegExp(
 );
 const CODE_FENCE_REGEX = /(```[\s\S]*?```)/g;
 
-const createRoleplayNode = (value: string): Node => {
+const createTextNode = (value: string): RoleplayNode => ({
+  type: 'text',
+  value,
+});
+
+const createRoleplayNode = (value: string): RoleplayNode => {
   const isAction = value.startsWith('(') && value.endsWith(')');
   return {
     type: isAction ? 'rp-action' : 'rp-dialogue',
@@ -28,7 +41,7 @@ const createRoleplayNode = (value: string): Node => {
       hName: 'span',
       hProperties: { className: [isAction ? 'rp-action' : 'rp-dialogue'] },
     },
-    children: [{ type: 'text', value }],
+    children: [createTextNode(value)],
   };
 };
 
@@ -56,12 +69,12 @@ export const normalizeRoleplayContent = (value: string) => {
     .join('');
 };
 
-function processTree(tree: Node) {
+function processTree(tree: RoleplayNode) {
   visit(tree, 'text', (node, index, parent) => {
-    const textNode = node as TextNode;
-    const parentNode = parent as ParentNode | null;
+    const textNode = node as RoleplayNode;
+    const parentNode = parent as RoleplayNode | null;
 
-    if (typeof textNode.value !== 'string' || !parentNode || index == null) {
+    if (typeof textNode.value !== 'string' || !parentNode?.children || index == null) {
       return;
     }
 
@@ -71,20 +84,20 @@ function processTree(tree: Node) {
     }
 
     ROLEPLAY_TOKEN_REGEX.lastIndex = 0;
-    const segments: Node[] = [];
+    const segments: RoleplayNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
     while ((match = ROLEPLAY_TOKEN_REGEX.exec(textNode.value)) !== null) {
       if (match.index > lastIndex) {
-        segments.push({ type: 'text', value: textNode.value.slice(lastIndex, match.index) });
+        segments.push(createTextNode(textNode.value.slice(lastIndex, match.index)));
       }
       segments.push(createRoleplayNode(match[0]));
       lastIndex = match.index + match[0].length;
     }
 
     if (lastIndex < textNode.value.length) {
-      segments.push({ type: 'text', value: textNode.value.slice(lastIndex) });
+      segments.push(createTextNode(textNode.value.slice(lastIndex)));
     }
 
     if (segments.length > 1) {
@@ -95,7 +108,7 @@ function processTree(tree: Node) {
 }
 
 export function remarkRoleplay() {
-  return (tree: Node) => {
+  return (tree: RoleplayNode) => {
     processTree(tree);
   };
 }

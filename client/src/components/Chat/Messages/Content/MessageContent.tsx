@@ -1,4 +1,4 @@
-import { memo, Suspense, useMemo } from 'react';
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRecoilValue } from 'recoil';
 import { DelayedRender } from '@librechat/client';
 import { extractSuggestions, extractThinkingContent } from 'librechat-data-provider';
@@ -8,6 +8,7 @@ import Error from '~/components/Messages/Content/Error';
 import { useMessageContext } from '~/Providers';
 import MarkdownLite from './MarkdownLite';
 import EditMessage from './EditMessage';
+import KynsDeepThinkingLoader from './Parts/KynsDeepThinkingLoader';
 import Thinking from './Parts/Thinking';
 import { useStreamingAnimation } from '~/hooks/useStreamingAnimation';
 import { useLocalize } from '~/hooks';
@@ -19,6 +20,7 @@ import store from '~/store';
 const ERROR_CONNECTION_TEXT = 'Error connecting to server, try refreshing the page.';
 const DELAYED_ERROR_TIMEOUT = 5500;
 const UNFINISHED_DELAY = 250;
+const DEEP_LOADER_MIN_DURATION_MS = 2200;
 
 const LoadingFallback = () => (
   <div className="text-message mb-[0.625rem] flex min-h-[20px] flex-col items-start gap-3 overflow-visible">
@@ -85,8 +87,19 @@ export const ErrorMessage = ({
   );
 };
 
-const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplayProps) => {
-  const { isSubmitting = false, isLatestMessage = false, isCharacterMessage = false } = useMessageContext();
+const DisplayMessage = ({
+  text,
+  isCreatedByUser,
+  message,
+  showCursor,
+  isKynsImageMessage = false,
+  isKynsDeepMessage = false,
+}: TDisplayProps) => {
+  const {
+    isSubmitting = false,
+    isLatestMessage = false,
+    isCharacterMessage = false,
+  } = useMessageContext();
   const enableUserMsgMarkdown = useRecoilValue(store.enableUserMsgMarkdown);
 
   const showCursorState = useMemo(
@@ -96,16 +109,59 @@ const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplay
 
   const isStreaming = isSubmitting && isLatestMessage && !isCreatedByUser;
   const visibleText = useStreamingAnimation({ text, isStreaming });
+  const [showDeepLoader, setShowDeepLoader] = useState(false);
+  const deepLoaderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (deepLoaderTimeoutRef.current != null) {
+      clearTimeout(deepLoaderTimeoutRef.current);
+      deepLoaderTimeoutRef.current = null;
+    }
+
+    if (!isKynsDeepMessage || !isStreaming) {
+      setShowDeepLoader(false);
+      return;
+    }
+
+    setShowDeepLoader(true);
+    deepLoaderTimeoutRef.current = setTimeout(() => {
+      setShowDeepLoader(false);
+      deepLoaderTimeoutRef.current = null;
+    }, DEEP_LOADER_MIN_DURATION_MS);
+
+    return () => {
+      if (deepLoaderTimeoutRef.current != null) {
+        clearTimeout(deepLoaderTimeoutRef.current);
+        deepLoaderTimeoutRef.current = null;
+      }
+    };
+  }, [isKynsDeepMessage, isStreaming, message?.messageId]);
+
+  const shouldShowDeepLoader = isKynsDeepMessage && isStreaming && (showDeepLoader || visibleText.length === 0);
 
   const content = useMemo(() => {
     if (!isCreatedByUser) {
-      return <Markdown content={visibleText} isLatestMessage={isLatestMessage} isRoleplay={isCharacterMessage} />;
+      return (
+        <Markdown
+          content={visibleText}
+          isLatestMessage={isLatestMessage}
+          isRoleplay={isCharacterMessage}
+          isKynsImageMessage={isKynsImageMessage}
+        />
+      );
     }
     if (enableUserMsgMarkdown) {
       return <MarkdownLite content={visibleText} />;
     }
     return <>{visibleText}</>;
-  }, [isCreatedByUser, enableUserMsgMarkdown, visibleText, isLatestMessage, isCharacterMessage]);
+  }, [
+    isCreatedByUser,
+    enableUserMsgMarkdown,
+    visibleText,
+    isLatestMessage,
+    isCharacterMessage,
+    isKynsImageMessage,
+  ]);
 
   return (
     <Container message={message}>
@@ -119,7 +175,7 @@ const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplay
           isCharacterMessage && !isCreatedByUser && 'rp-message',
         )}
       >
-        {content}
+        {shouldShowDeepLoader ? <KynsDeepThinkingLoader /> : content}
       </div>
     </Container>
   );
@@ -145,13 +201,23 @@ const MessageContent = ({
   const { messageId } = message;
 
   const cleanText = useMemo(() => extractSuggestions(text).cleanText, [text]);
-  const { regularContent, segments } = useMemo(() => extractThinkingContent(cleanText), [cleanText]);
+  const { regularContent, segments } = useMemo(
+    () => extractThinkingContent(cleanText),
+    [cleanText],
+  );
   const thinkingSegments = useMemo(
     () => segments.filter((segment) => segment.type === 'think'),
     [segments],
   );
+  const shouldShowDeepLoader =
+    props.isKynsDeepMessage === true &&
+    props.isCreatedByUser === false &&
+    isSubmitting &&
+    regularContent.length === 0 &&
+    thinkingSegments.length === 0;
   const showRegularCursor = useMemo(() => isLast && isSubmitting, [isLast, isSubmitting]);
-  const shouldRenderRegularContent = regularContent.length > 0 || thinkingSegments.length === 0;
+  const shouldRenderRegularContent =
+    !shouldShowDeepLoader && (regularContent.length > 0 || thinkingSegments.length === 0);
 
   const unfinishedMessage = useMemo(
     () =>
@@ -178,6 +244,11 @@ const MessageContent = ({
       {thinkingSegments.map((segment, index) => (
         <Thinking key={`thinking-${messageId}-${index}`}>{segment.content}</Thinking>
       ))}
+      {shouldShowDeepLoader && (
+        <Container message={message}>
+          <KynsDeepThinkingLoader />
+        </Container>
+      )}
       {shouldRenderRegularContent && (
         <DisplayMessage
           key={`display-${messageId}`}

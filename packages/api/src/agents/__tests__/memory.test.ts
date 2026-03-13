@@ -2,7 +2,15 @@ import { Response } from 'express';
 import { Providers } from '@librechat/agents';
 import { Tools } from 'librechat-data-provider';
 import type { MemoryArtifact } from 'librechat-data-provider';
-import { createMemoryTool, processMemory } from '../memory';
+import { createMemoryProcessor, createMemoryTool, processMemory } from '../memory';
+
+jest.mock('@librechat/data-schemas', () => ({
+  logger: {
+    debug: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
 
 // Mock the logger
 jest.mock('winston', () => ({
@@ -18,6 +26,7 @@ jest.mock('winston', () => ({
   },
   transports: {
     Console: jest.fn(),
+    File: class MockFileTransport {},
   },
 }));
 
@@ -135,6 +144,28 @@ describe('createMemoryTool', () => {
         key: 'test',
         value: 'small memory',
         tokenCount: 12,
+        scope: 'user',
+        agentId: undefined,
+      });
+    });
+
+    it('should save character-scoped memories with agent context', async () => {
+      const tool = createMemoryTool({
+        userId: 'test-user',
+        setMemory: mockSetMemory,
+        scope: 'agent',
+        agentId: 'agent-123',
+      });
+
+      await tool.func({ key: 'preferences', value: 'The user likes late-night conversations.' });
+
+      expect(mockSetMemory).toHaveBeenCalledWith({
+        userId: 'test-user',
+        key: 'preferences',
+        value: 'The user likes late-night conversations.',
+        tokenCount: 40,
+        scope: 'agent',
+        agentId: 'agent-123',
       });
     });
   });
@@ -465,5 +496,55 @@ describe('processMemory - GPT-5+ handling', () => {
         }),
       }),
     );
+  });
+});
+
+describe('createMemoryProcessor', () => {
+  let mockRes: Partial<Response>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRes = {
+      headersSent: false,
+      write: jest.fn(),
+    };
+
+    const { Run } = jest.requireMock('@librechat/agents');
+    (Run.create as jest.Mock).mockResolvedValue({
+      processStream: jest.fn().mockResolvedValue('Memory processed'),
+    });
+  });
+
+  it('should request formatted memories with the current agent id and merge instructions', async () => {
+    const memoryMethods = {
+      setMemory: jest.fn().mockResolvedValue({ ok: true }),
+      deleteMemory: jest.fn().mockResolvedValue({ ok: true }),
+      getFormattedMemories: jest.fn().mockResolvedValue({
+        withKeys: '# Character-specific memory\n1. test memory',
+        withoutKeys: '# Character-specific memory\n1. test memory',
+        totalTokens: 25,
+      }),
+    };
+
+    const [context, processFn] = await createMemoryProcessor({
+      res: mockRes as Response,
+      userId: 'test-user',
+      messageId: 'msg-123',
+      conversationId: 'conv-123',
+      memoryMethods,
+      agentId: 'agent-123',
+      agentName: 'Luna',
+      config: {
+        instructions: 'Custom memory policy.',
+      },
+    });
+
+    expect(memoryMethods.getFormattedMemories).toHaveBeenCalledWith({
+      userId: 'test-user',
+      agentId: 'agent-123',
+    });
+    expect(context).toContain('# Character-specific memory');
+
+    await processFn([]);
   });
 });

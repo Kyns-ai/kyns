@@ -19,8 +19,32 @@ const buildFunction = {
   [EModelEndpoint.azureAssistants]: azureAssistants.buildOptions,
 };
 
+const KYNS_DEEP_SPEC = 'kyns-deep';
+
+const getEffectiveEndpoint = (endpoint, spec) =>
+  endpoint === 'KYNSDeep' || spec === KYNS_DEEP_SPEC ? 'KYNS' : endpoint;
+
+const applySpecOverrides = (parsedBody) => {
+  if (parsedBody?.spec !== KYNS_DEEP_SPEC) {
+    return parsedBody;
+  }
+
+  return {
+    ...parsedBody,
+    reasoning_effort:
+      parsedBody.reasoning_effort == null || parsedBody.reasoning_effort === ''
+        ? 'high'
+        : parsedBody.reasoning_effort,
+    chat_template_kwargs: {
+      ...(parsedBody.chat_template_kwargs ?? {}),
+      enable_thinking: true,
+    },
+  };
+};
+
 async function buildEndpointOption(req, res, next) {
-  const { endpoint, endpointType } = req.body;
+  const { endpoint: requestedEndpoint, endpointType } = req.body;
+  const endpoint = getEffectiveEndpoint(requestedEndpoint, req.body?.spec);
 
   let endpointsConfig;
   try {
@@ -36,7 +60,10 @@ async function buildEndpointOption(req, res, next) {
     parsedBody = parseCompactConvo({
       endpoint,
       endpointType,
-      conversation: req.body,
+      conversation: {
+        ...req.body,
+        endpoint,
+      },
       defaultParamsEndpoint,
     });
   } catch (error) {
@@ -48,8 +75,8 @@ async function buildEndpointOption(req, res, next) {
   }
 
   const appConfig = req.config;
-  const isAgentEndpoint =
-    isAgentsEndpoint(endpoint) || req.baseUrl.startsWith(EndpointURLs[EModelEndpoint.agents]);
+  const isAgentRoute = req.baseUrl.startsWith(EndpointURLs[EModelEndpoint.agents]);
+  const isAgentEndpoint = isAgentsEndpoint(endpoint);
 
   if (!isAgentEndpoint && appConfig.modelSpecs?.list && appConfig.modelSpecs?.enforce) {
     /** @type {{ list: TModelSpec[] }}*/
@@ -65,12 +92,14 @@ async function buildEndpointOption(req, res, next) {
       return handleError(res, { text: 'Invalid model spec' });
     }
 
-    if (endpoint !== currentModelSpec.preset.endpoint) {
+    const normalizedSpecEndpoint = getEffectiveEndpoint(currentModelSpec.preset.endpoint, spec);
+    if (endpoint !== normalizedSpecEndpoint) {
       return handleError(res, { text: 'Model spec mismatch' });
     }
 
     try {
       currentModelSpec.preset.spec = spec;
+      currentModelSpec.preset.endpoint = endpoint;
       parsedBody = parseCompactConvo({
         endpoint,
         endpointType,
@@ -92,15 +121,23 @@ async function buildEndpointOption(req, res, next) {
     }
   }
 
+  parsedBody = applySpecOverrides(parsedBody);
+
   try {
-    const isAgents =
-      isAgentsEndpoint(endpoint) || req.baseUrl.startsWith(EndpointURLs[EModelEndpoint.agents]);
+    const isAgents = isAgentEndpoint || isAgentRoute;
     const builder = isAgents
       ? (...args) => buildFunction[EModelEndpoint.agents](req, ...args)
       : buildFunction[endpointType ?? endpoint];
 
     // TODO: use object params
     req.body = req.body || {}; // Express 5: ensure req.body exists
+    req.body.endpoint = endpoint;
+    if (parsedBody.promptPrefix !== undefined) {
+      req.body.promptPrefix = parsedBody.promptPrefix;
+    }
+    if (parsedBody.modelLabel !== undefined) {
+      req.body.modelLabel = parsedBody.modelLabel;
+    }
     req.body.endpointOption = await builder(endpoint, parsedBody, endpointType);
 
     if (req.body.files && !isAgents) {

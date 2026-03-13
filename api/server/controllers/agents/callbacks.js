@@ -119,6 +119,7 @@ async function emitEvent(res, streamId, eventData) {
  * @param {Object} options - The options object.
  * @param {ServerResponse} options.res - The server response object.
  * @param {ContentAggregator} options.aggregateContent - Content aggregator function.
+ * @param {Object} [options.responseGuard] - Optional response guard for buffering/filtering visible output.
  * @param {ToolEndCallback} options.toolEndCallback - Callback to use when tool ends.
  * @param {Array<UsageMetadata>} options.collectedUsage - The list of collected usage metadata.
  * @param {string | null} [options.streamId] - The stream ID for resumable mode, or null for standard mode.
@@ -129,6 +130,7 @@ async function emitEvent(res, streamId, eventData) {
 function getDefaultHandlers({
   res,
   aggregateContent,
+  responseGuard = null,
   toolEndCallback,
   collectedUsage,
   streamId = null,
@@ -139,6 +141,21 @@ function getDefaultHandlers({
       `[getDefaultHandlers] Missing required options: res: ${!res}, aggregateContent: ${!aggregateContent}`,
     );
   }
+  const emitGuardEvents = async (guardResult, fallbackEvent) => {
+    if (guardResult?.error) {
+      throw guardResult.error;
+    }
+    if (Array.isArray(guardResult?.flushEvents) && guardResult.flushEvents.length > 0) {
+      for (const bufferedEvent of guardResult.flushEvents) {
+        await emitEvent(res, streamId, bufferedEvent);
+      }
+    }
+    if (guardResult?.emit === false) {
+      return;
+    }
+    await emitEvent(res, streamId, fallbackEvent);
+  };
+
   const handlers = {
     [GraphEvents.CHAT_MODEL_END]: new ModelEndHandler(collectedUsage),
     [GraphEvents.TOOL_END]: new ToolEndHandler(toolEndCallback, logger),
@@ -215,11 +232,15 @@ function getDefaultHandlers({
        * @param {GraphRunnableConfig['configurable']} [metadata] The runnable metadata.
        */
       handle: async (event, data, metadata) => {
-        aggregateContent({ event, data });
+        const currentEvent = { event, data };
+        const guardResult = responseGuard?.handleMessageDelta(currentEvent) ?? null;
+        if (guardResult?.aggregate !== false) {
+          aggregateContent(currentEvent);
+        }
         if (checkIfLastAgent(metadata?.last_agent_id, metadata?.langgraph_node)) {
-          await emitEvent(res, streamId, { event, data });
+          await emitGuardEvents(guardResult, currentEvent);
         } else if (!metadata?.hide_sequential_outputs) {
-          await emitEvent(res, streamId, { event, data });
+          await emitGuardEvents(guardResult, currentEvent);
         }
       },
     },
@@ -231,11 +252,15 @@ function getDefaultHandlers({
        * @param {GraphRunnableConfig['configurable']} [metadata] The runnable metadata.
        */
       handle: async (event, data, metadata) => {
-        aggregateContent({ event, data });
+        const currentEvent = { event, data };
+        const guardResult = responseGuard?.handleReasoningDelta(currentEvent) ?? null;
+        if (guardResult?.aggregate !== false) {
+          aggregateContent(currentEvent);
+        }
         if (checkIfLastAgent(metadata?.last_agent_id, metadata?.langgraph_node)) {
-          await emitEvent(res, streamId, { event, data });
+          await emitGuardEvents(guardResult, currentEvent);
         } else if (!metadata?.hide_sequential_outputs) {
-          await emitEvent(res, streamId, { event, data });
+          await emitGuardEvents(guardResult, currentEvent);
         }
       },
     },

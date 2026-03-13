@@ -13,10 +13,16 @@ jest.mock('librechat-data-provider', () => {
 
 const { EModelEndpoint, parseCompactConvo } = require('librechat-data-provider');
 
-const mockBuildOptions = jest.fn((_endpoint, parsedBody) => ({
-  ...parsedBody,
-  endpoint: _endpoint,
-}));
+const mockBuildOptions = jest.fn((...args) => {
+  const hasReqArgument = typeof args[0] === 'object' && args[0] != null && 'body' in args[0];
+  const endpoint = hasReqArgument ? args[1] : args[0];
+  const parsedBody = hasReqArgument ? args[2] : args[1];
+
+  return {
+    ...parsedBody,
+    endpoint,
+  };
+});
 
 jest.mock('~/server/services/Endpoints/azureAssistants', () => ({
   buildOptions: mockBuildOptions,
@@ -43,10 +49,10 @@ jest.mock('@librechat/api', () => ({
 
 const buildEndpointOption = require('./buildEndpointOption');
 
-const createReq = (body, config = {}) => ({
+const createReq = (body, config = {}, baseUrl = '/api/chat') => ({
   body,
   config,
-  baseUrl: '/api/chat',
+  baseUrl,
 });
 
 const createRes = () => ({
@@ -233,5 +239,158 @@ describe('buildEndpointOption - defaultParamsEndpoint parsing', () => {
     const parsedResult = parseCompactConvo.mock.results[0].value;
     expect(parsedResult.maxOutputTokens).toBeUndefined();
     expect(parsedResult.max_tokens).toBe(4096);
+  });
+
+  it('should enforce model spec and sync promptPrefix on agent route for custom endpoints', async () => {
+    mockGetEndpointsConfig.mockResolvedValue({
+      KYNS: {
+        type: EModelEndpoint.custom,
+      },
+    });
+
+    const modelSpec = {
+      name: 'kyns',
+      preset: {
+        endpoint: 'KYNS',
+        endpointType: EModelEndpoint.custom,
+        model: 'llmfan46/Qwen3.5-27B-heretic-v2',
+        promptPrefix: 'Fresh prompt from model spec',
+      },
+    };
+
+    const req = createReq(
+      {
+        endpoint: 'KYNS',
+        endpointType: EModelEndpoint.custom,
+        spec: 'kyns',
+        promptPrefix: 'Stale prompt from saved conversation',
+      },
+      {
+        modelSpecs: {
+          enforce: true,
+          list: [modelSpec],
+        },
+      },
+      '/api/agents/chat',
+    );
+
+    await buildEndpointOption(req, createRes(), jest.fn());
+
+    expect(parseCompactConvo).toHaveBeenCalledTimes(2);
+    expect(parseCompactConvo.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        conversation: expect.objectContaining({
+          endpoint: 'KYNS',
+          promptPrefix: 'Fresh prompt from model spec',
+        }),
+      }),
+    );
+    expect(req.body.promptPrefix).toBe('Fresh prompt from model spec');
+  });
+
+  it('should normalize legacy KYNSDeep requests to the KYNS endpoint', async () => {
+    mockGetEndpointsConfig.mockResolvedValue({
+      KYNS: {
+        type: EModelEndpoint.custom,
+      },
+    });
+
+    const modelSpec = {
+      name: 'kyns-deep',
+      preset: {
+        endpoint: 'KYNS',
+        endpointType: EModelEndpoint.custom,
+        model: 'llmfan46/Qwen3.5-27B-heretic-v2',
+        modelLabel: 'KYNS Deep',
+      },
+    };
+
+    const req = createReq(
+      {
+        endpoint: 'KYNSDeep',
+        endpointType: EModelEndpoint.custom,
+        spec: 'kyns-deep',
+      },
+      {
+        modelSpecs: {
+          enforce: true,
+          list: [modelSpec],
+        },
+      },
+      '/api/agents/chat',
+    );
+    const next = jest.fn();
+
+    await buildEndpointOption(req, createRes(), next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.body.endpoint).toBe('KYNS');
+    expect(req.body.endpointOption.endpoint).toBe('KYNS');
+  });
+
+  it('should accept legacy KYNSDeep model spec endpoints when enforcing kyns-deep', async () => {
+    mockGetEndpointsConfig.mockResolvedValue({
+      KYNS: {
+        type: EModelEndpoint.custom,
+      },
+    });
+
+    const modelSpec = {
+      name: 'kyns-deep',
+      preset: {
+        endpoint: 'KYNSDeep',
+        endpointType: EModelEndpoint.custom,
+        model: 'llmfan46/Qwen3.5-27B-heretic-v2',
+        modelLabel: 'KYNS Deep',
+      },
+    };
+
+    const req = createReq(
+      {
+        endpoint: 'KYNSDeep',
+        endpointType: EModelEndpoint.custom,
+        spec: 'kyns-deep',
+      },
+      {
+        modelSpecs: {
+          enforce: true,
+          list: [modelSpec],
+        },
+      },
+      '/api/agents/chat',
+    );
+    const next = jest.fn();
+
+    await buildEndpointOption(req, createRes(), next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.body.endpoint).toBe('KYNS');
+    expect(req.body.endpointOption.endpoint).toBe('KYNS');
+  });
+
+  it('should enable hidden thinking for the kyns-deep spec', async () => {
+    mockGetEndpointsConfig.mockResolvedValue({
+      KYNS: {
+        type: EModelEndpoint.custom,
+      },
+    });
+
+    const req = createReq(
+      {
+        endpoint: 'KYNS',
+        endpointType: EModelEndpoint.custom,
+        spec: 'kyns-deep',
+        model: 'llmfan46/Qwen3.5-27B-heretic-v2',
+      },
+      { modelSpecs: null },
+      '/api/agents/chat',
+    );
+
+    await buildEndpointOption(req, createRes(), jest.fn());
+
+    expect(req.body.endpointOption.reasoning_effort).toBe('high');
+    expect(req.body.endpointOption.chat_template_kwargs).toEqual({
+      enable_thinking: true,
+    });
   });
 });

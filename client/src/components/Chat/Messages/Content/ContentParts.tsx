@@ -9,10 +9,11 @@ import type {
 import { MessageContext, SearchContext } from '~/Providers';
 import { ParallelContentRenderer, type PartWithIndex } from './ParallelContent';
 import { mapAttachments } from '~/utils';
-import { EditTextPart, EmptyText, ResponseTimer } from './Parts';
+import { EditTextPart, EmptyText, ResponseTimer, KynsDeepThinkingLoader } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';
 import Sources from '~/components/Web/Sources';
 import Container from './Container';
+import KynsImageGeneration from './KynsImageGeneration';
 import Part from './Part';
 
 type PartWithContextProps = {
@@ -80,6 +81,8 @@ type ContentPartsProps = {
   attachments?: TAttachment[];
   searchResults?: { [key: string]: SearchResultData };
   isCreatedByUser: boolean;
+  isKynsImageMessage?: boolean;
+  isKynsDeepMessage?: boolean;
   isCharacterMessage?: boolean;
   isLast: boolean;
   isSubmitting: boolean;
@@ -114,6 +117,8 @@ const ContentParts = memo(function ContentParts({
   searchResults,
   conversationId,
   isCreatedByUser,
+  isKynsImageMessage = false,
+  isKynsDeepMessage = false,
   isCharacterMessage,
   isLatestMessage,
   showResponseTimer = false,
@@ -233,7 +238,17 @@ const ContentParts = memo(function ContentParts({
       <Sources messageId={messageId} conversationId={conversationId || undefined} />
       {showEmptyCursor && (
         <Container>
-          <EmptyText />
+          {isKynsImageMessage ? (
+            <div className="not-prose mt-2 w-full max-w-lg">
+              <div className="aspect-square">
+                <KynsImageGeneration />
+              </div>
+            </div>
+          ) : isKynsDeepMessage ? (
+            <KynsDeepThinkingLoader />
+          ) : (
+            <EmptyText />
+          )}
           {showResponseTimer && <ResponseTimer />}
         </Container>
       )}

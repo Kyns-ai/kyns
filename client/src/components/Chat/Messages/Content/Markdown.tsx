@@ -21,15 +21,22 @@ import { langSubset, preprocessLaTeX } from '~/utils';
 import { normalizeRoleplayContent, remarkRoleplay } from '~/utils/remarkRoleplay';
 import { unicodeCitation } from '~/components/Web';
 import { code, a, p, img } from './MarkdownComponents';
+import KynsImageGeneration from './KynsImageGeneration';
 import store from '~/store';
 
 type TContentProps = {
   content: string;
   isLatestMessage: boolean;
   isRoleplay?: boolean;
+  isKynsImageMessage?: boolean;
 };
 
-const Markdown = memo(function Markdown({ content = '', isLatestMessage, isRoleplay = false }: TContentProps) {
+const Markdown = memo(function Markdown({
+  content = '',
+  isLatestMessage,
+  isRoleplay = false,
+  isKynsImageMessage = false,
+}: TContentProps) {
   const LaTeXParsing = useRecoilValue<boolean>(store.LaTeXParsing);
   const isInitializing = content === '';
 
@@ -73,6 +80,16 @@ const Markdown = memo(function Markdown({ content = '', isLatestMessage, isRolep
   }, [isRoleplay]);
 
   if (isInitializing) {
+    if (isKynsImageMessage) {
+      return (
+        <div className="not-prose mt-2 w-full max-w-lg">
+          <div className="aspect-square">
+            <KynsImageGeneration />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="absolute">
         <p className="relative">

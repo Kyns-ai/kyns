@@ -552,7 +552,9 @@ export default function useResumableSSE(
    * Retries up to 3 times on network errors with exponential backoff.
    */
   const startGeneration = useCallback(
-    async (currentSubmission: TSubmission): Promise<string | null> => {
+    async (
+      currentSubmission: TSubmission,
+    ): Promise<{ handled: boolean; streamId: string | null }> => {
       const payloadData = createPayload(currentSubmission);
       let { payload } = payloadData;
       payload = removeNullishValues(payload) as TPayload;
@@ -567,9 +569,24 @@ export default function useResumableSSE(
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           // Use request.post which handles auth token refresh via axios interceptors
-          const data = (await request.post(url, payload)) as { streamId: string };
+          const data = (await request.post(url, payload)) as {
+            streamId?: string;
+            final?: boolean;
+            blocked?: boolean;
+          };
+          if (data.final != null && 'responseMessage' in data) {
+            clearDraft(currentSubmission.conversation?.conversationId);
+            finalHandler(data as unknown as Parameters<typeof finalHandler>[0], currentSubmission as EventSubmission);
+            (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
+            setIsSubmitting(false);
+            setShowStopButton(false);
+            return { handled: true, streamId: null };
+          }
+          if (!data.streamId) {
+            throw new Error('Missing streamId in generation start response');
+          }
           console.log('[ResumableSSE] Generation started:', { streamId: data.streamId });
-          return data.streamId;
+          return { handled: true, streamId: data.streamId };
         } catch (error) {
           lastError = error;
           // Check if it's a network error (retry) vs server error (don't retry)
@@ -607,9 +624,17 @@ export default function useResumableSSE(
         errorHandler({ data: undefined, submission: currentSubmission as EventSubmission });
       }
       setIsSubmitting(false);
-      return null;
+      return { handled: false, streamId: null };
     },
-    [clearStepMaps, errorHandler, setIsSubmitting],
+    [
+      clearStepMaps,
+      errorHandler,
+      finalHandler,
+      setIsSubmitting,
+      setShowStopButton,
+      startupConfig?.balance?.enabled,
+      balanceQuery,
+    ],
   );
 
   useEffect(() => {
@@ -655,18 +680,18 @@ export default function useResumableSSE(
       } else {
         // New generation: start and then subscribe
         console.log('[ResumableSSE] Starting NEW generation');
-        const newStreamId = await startGeneration(submission);
-        if (newStreamId) {
-          setStreamId(newStreamId);
+        const startResult = await startGeneration(submission);
+        if (startResult.streamId) {
+          setStreamId(startResult.streamId);
           // Optimistically add to active jobs
-          addActiveJob(newStreamId);
+          addActiveJob(startResult.streamId);
           // Queue title generation if this is a new conversation (first message)
           const isNewConvo = submission.userMessage?.parentMessageId === Constants.NO_PARENT;
           if (isNewConvo) {
-            queueTitleGeneration(newStreamId);
+            queueTitleGeneration(startResult.streamId);
           }
-          subscribeToStream(newStreamId, submission);
-        } else {
+          subscribeToStream(startResult.streamId, submission);
+        } else if (!startResult.handled) {
           console.error('[ResumableSSE] Failed to get streamId from startGeneration');
         }
       }

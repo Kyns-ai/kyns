@@ -1,5 +1,6 @@
 const { Providers } = require('@librechat/agents');
 const { Constants, EModelEndpoint } = require('librechat-data-provider');
+const { prependKynsMasterPrompt } = require('~/server/services/safety/kynsPlatform');
 const AgentClient = require('./client');
 
 jest.mock('@librechat/agents', () => ({
@@ -1397,7 +1398,9 @@ describe('AgentClient - titleConvo', () => {
       });
 
       // Verify the instructions still work without MCP content (from agent config, not buildOptions)
-      expect(client.options.agent.instructions).toBe('Base agent instructions');
+      expect(client.options.agent.instructions).toBe(
+        prependKynsMasterPrompt('Base agent instructions'),
+      );
       expect(client.options.agent.instructions).not.toContain('[object Promise]');
     });
 
@@ -2006,7 +2009,9 @@ describe('AgentClient - titleConvo', () => {
         additional_instructions: null,
       });
 
-      expect(parallelAgent.instructions).toBe('Original parallel instructions');
+      expect(parallelAgent.instructions).toBe(
+        prependKynsMasterPrompt('Original parallel instructions'),
+      );
     });
 
     it('should handle parallel agents without existing instructions', async () => {

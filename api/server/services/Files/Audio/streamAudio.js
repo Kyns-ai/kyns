@@ -3,7 +3,7 @@ const {
   CacheKeys,
   SEPARATORS,
   parseTextParts,
-  sanitizeTextForTTS,
+  extractDialogueForTTS,
   extractThinkingContent,
   findLastSeparatorIndex,
 } = require('librechat-data-provider');
@@ -96,7 +96,7 @@ function createChunkProcessor(user, messageId) {
         message.content?.length > 0
           ? parseTextParts(message.content, true)
           : extractThinkingContent(message.text ?? '').regularContent;
-      const text = sanitizeTextForTTS(rawText);
+      const text = extractDialogueForTTS(rawText);
       messageCache.set(
         messageId,
         {
@@ -109,8 +109,8 @@ function createChunkProcessor(user, messageId) {
 
     const text =
       typeof message === 'string'
-        ? sanitizeTextForTTS(extractThinkingContent(message).regularContent)
-        : sanitizeTextForTTS(extractThinkingContent(message.text ?? '').regularContent);
+        ? extractDialogueForTTS(extractThinkingContent(message).regularContent)
+        : extractDialogueForTTS(extractThinkingContent(message.text ?? '').regularContent);
     const complete = typeof message === 'string' ? false : (message.complete ?? true);
 
     if (text === processedText) {

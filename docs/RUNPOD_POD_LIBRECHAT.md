@@ -42,10 +42,14 @@ Isso define `OPENAI_REVERSE_PROXY` e dispara o redeploy.
 
 ## 3. “Ficar ligado 10 minutos depois da última mensagem”
 
-- **Pod** não tem idle timeout: ele fica ligado até você **parar** manualmente (ou via API).
-- Para “ficar ligado 10 min depois da última mensagem” e depois desligar:
-  - Use o pod normalmente; quando for encerrar o uso, espere ~10 min e **pare o pod** (no console RunPod ou com o script abaixo).
-  - Assim você evita desligar no meio de uma conversa e ainda economiza quando não estiver usando.
+- **Pod** não tem idle timeout nativo: ele fica ligado até você **parar** manualmente (ou via API).
+- No KYNS, há um watcher no backend que pode pedir `stop` do pod após inatividade real de chat.
+- Para isso funcionar, no Railway você precisa definir:
+  - `RUNPOD_API_KEY`
+  - `RUNPOD_POD_ID`
+  - `RUNPOD_IDLE_TIMEOUT_MINUTES=10` (ou outro valor)
+- O watcher só atua quando `OPENAI_REVERSE_PROXY` aponta para uma URL de **pod** (`*.proxy.runpod.net`) e quando não há geração em andamento.
+- Se essas variáveis não estiverem configuradas, o comportamento volta a ser manual.
 
 **Parar o pod por script (opcional):**
 
@@ -81,5 +85,5 @@ O cold start do pod acontece **só quando você inicia (ou reinicia) o pod**. Pa
 | Objetivo | Como |
 |----------|------|
 | Usar Pod com LibreChat | Definir `OPENAI_REVERSE_PROXY` = `https://POD_ID-8000.proxy.runpod.net/v1` no Railway e redeploy. |
-| “Ligado 10 min depois da última mensagem” | Usar o pod; quando for sair, esperar ~10 min e parar o pod (console ou `runpod-stop-pod.js`). |
+| “Ligado 10 min depois da última mensagem” | Definir `RUNPOD_API_KEY`, `RUNPOD_POD_ID` e `RUNPOD_IDLE_TIMEOUT_MINUTES=10` para o watcher pedir `stop` automático após idle. |
 | Cold start menos ruim | Network volume com modelo; manter pod ligado durante o uso; desligar só quando não for usar por um tempo. |

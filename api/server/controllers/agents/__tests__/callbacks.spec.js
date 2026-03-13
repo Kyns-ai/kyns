@@ -1,4 +1,4 @@
-const { Tools } = require('librechat-data-provider');
+const { Tools, ContentTypes } = require('librechat-data-provider');
 
 // Mock all dependencies before requiring the module
 jest.mock('nanoid', () => ({
@@ -325,5 +325,83 @@ describe('createToolEndCallback', () => {
       expect(artifactPromises).toHaveLength(0);
       expect(res.write).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('getDefaultHandlers response guard integration', () => {
+  let callbacks;
+  let aggregateContent;
+  let res;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    callbacks = require('../callbacks');
+    aggregateContent = jest.fn();
+    res = {};
+  });
+
+  it('should suppress reasoning deltas when response guard disables them', async () => {
+    const responseGuard = {
+      handleReasoningDelta: jest.fn(() => ({
+        aggregate: false,
+        emit: false,
+        flushEvents: [],
+      })),
+    };
+
+    const handlers = callbacks.getDefaultHandlers({
+      res,
+      aggregateContent,
+      responseGuard,
+      toolEndCallback: jest.fn(),
+      collectedUsage: [],
+    });
+
+    await handlers.on_reasoning_delta.handle(
+      'on_reasoning_delta',
+      {
+        delta: {
+          content: [{ type: ContentTypes.THINK, think: 'hidden' }],
+        },
+      },
+      { last_agent_id: 'agent-1', langgraph_node: 'agent-1' },
+    );
+
+    expect(responseGuard.handleReasoningDelta).toHaveBeenCalled();
+    expect(aggregateContent).not.toHaveBeenCalled();
+  });
+
+  it('should throw response guard errors before emitting visible content', async () => {
+    const blockedError = new Error('blocked');
+    const responseGuard = {
+      handleMessageDelta: jest.fn(() => ({
+        aggregate: false,
+        emit: false,
+        flushEvents: [],
+        error: blockedError,
+      })),
+    };
+
+    const handlers = callbacks.getDefaultHandlers({
+      res,
+      aggregateContent,
+      responseGuard,
+      toolEndCallback: jest.fn(),
+      collectedUsage: [],
+    });
+
+    await expect(
+      handlers.on_message_delta.handle(
+        'on_message_delta',
+        {
+          delta: {
+            content: [{ type: ContentTypes.TEXT, text: 'blocked output' }],
+          },
+        },
+        { last_agent_id: 'agent-1', langgraph_node: 'agent-1' },
+      ),
+    ).rejects.toThrow('blocked');
+
+    expect(aggregateContent).not.toHaveBeenCalled();
   });
 });

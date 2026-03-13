@@ -207,7 +207,7 @@ export const homeContent = {
       eyebrow: 'PERSONAGENS',
       title: 'Personagens',
       description:
-        'Characters com personalidade própria para roleplay, conversa, mentoria e exploração criativa sem filtros corporativos desnecessários.',
+        'Personagens com personalidade própria para roleplay, conversa, mentoria e exploração criativa sem filtros corporativos desnecessários.',
     },
     {
       eyebrow: 'PRIVACIDADE',

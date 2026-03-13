@@ -19,6 +19,7 @@ const {
   createToolEndCallback,
   getDefaultHandlers,
 } = require('~/server/controllers/agents/callbacks');
+const { createKynsResponseGuard } = require('~/server/services/safety/kynsPlatform');
 const { loadAgentTools, loadToolsForExecution } = require('~/server/services/ToolService');
 const { getModelsConfig } = require('~/server/controllers/ModelController');
 const AgentClient = require('~/server/controllers/agents/client');
@@ -94,6 +95,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   /** @type {ArtifactPromises} */
   const artifactPromises = [];
   const { contentParts, aggregateContent } = createContentAggregator();
+  const responseGuard = createKynsResponseGuard({ contentParts });
   const toolEndCallback = createToolEndCallback({ req, res, artifactPromises, streamId });
 
   /**
@@ -137,6 +139,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     res,
     toolExecuteOptions,
     aggregateContent,
+    responseGuard,
     toolEndCallback,
     collectedUsage,
     streamId,

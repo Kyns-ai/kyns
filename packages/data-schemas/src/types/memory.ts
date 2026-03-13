@@ -1,8 +1,12 @@
 import type { Types, Document } from 'mongoose';
 
+export type MemoryScope = 'user' | 'agent';
+
 // Base memory interfaces
 export interface IMemoryEntry extends Document {
   userId: Types.ObjectId;
+  scope: MemoryScope;
+  agentId?: string;
   key: string;
   value: string;
   tokenCount?: number;
@@ -12,6 +16,8 @@ export interface IMemoryEntry extends Document {
 export interface IMemoryEntryLean {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
+  scope: MemoryScope;
+  agentId?: string;
   key: string;
   value: string;
   tokenCount?: number;
@@ -19,21 +25,27 @@ export interface IMemoryEntryLean {
   __v?: number;
 }
 
+interface MemoryScopeParams {
+  scope?: MemoryScope;
+  agentId?: string | null;
+}
+
 // Method parameter interfaces
-export interface SetMemoryParams {
+export interface SetMemoryParams extends MemoryScopeParams {
   userId: string | Types.ObjectId;
   key: string;
   value: string;
   tokenCount?: number;
 }
 
-export interface DeleteMemoryParams {
+export interface DeleteMemoryParams extends MemoryScopeParams {
   userId: string | Types.ObjectId;
   key: string;
 }
 
-export interface GetFormattedMemoriesParams {
+export interface GetFormattedMemoriesParams extends MemoryScopeParams {
   userId: string | Types.ObjectId;
+  includeUserScope?: boolean;
 }
 
 // Result interfaces

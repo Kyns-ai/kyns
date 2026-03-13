@@ -12,6 +12,7 @@ const checkInviteUser = require('./checkInviteUser');
 const requireJwtAuth = require('./requireJwtAuth');
 const configMiddleware = require('./config/app');
 const validateModel = require('./validateModel');
+const kynsSafetyText = require('./kynsSafetyText');
 const moderateText = require('./moderateText');
 const logHeaders = require('./logHeaders');
 const setHeaders = require('./setHeaders');
@@ -33,6 +34,7 @@ module.exports = {
   uaParser,
   setHeaders,
   logHeaders,
+  kynsSafetyText,
   moderateText,
   validateModel,
   requireJwtAuth,

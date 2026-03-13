@@ -45,6 +45,8 @@ const extractMCPServerNames = (tools) => {
   return Array.from(serverNames);
 };
 
+const getEffectiveProviderEndpoint = (endpoint) => (endpoint === 'KYNSDeep' ? 'KYNS' : endpoint);
+
 /**
  * Create an agent with the provided data.
  * @param {Object} agentData - The agent data to create.
@@ -169,7 +171,7 @@ const loadEphemeralAgent = async ({ req, spec, endpoint, model_parameters: _m })
   const result = {
     id: ephemeralId,
     instructions,
-    provider: endpoint,
+    provider: getEffectiveProviderEndpoint(endpoint),
     model_parameters,
     model,
     tools,

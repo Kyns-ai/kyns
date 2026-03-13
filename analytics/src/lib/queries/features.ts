@@ -39,8 +39,8 @@ export async function getFeatureUsage(): Promise<FeatureUsage[]> {
     {
       feature: 'deep_mode',
       label: 'KYNS Deep',
-      query7d: { createdAt: { $gte: sevenDaysAgo }, endpoint: 'KYNSDeep' },
-      query30d: { createdAt: { $gte: thirtyDaysAgo }, endpoint: 'KYNSDeep' },
+      query7d: { createdAt: { $gte: sevenDaysAgo }, spec: 'kyns-deep' },
+      query30d: { createdAt: { $gte: thirtyDaysAgo }, spec: 'kyns-deep' },
       col: 'conversations',
     },
     {
@@ -155,7 +155,7 @@ export async function getFeatureRetentionCorrelation(): Promise<FeatureRetention
       query: (users: string[]) => ({
         user: { $in: users },
         createdAt: { $gte: week1Start, $lt: week1End },
-        endpoint: 'KYNSDeep',
+        spec: 'kyns-deep',
       }),
       col: 'conversations',
     },

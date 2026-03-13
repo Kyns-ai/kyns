@@ -54,6 +54,7 @@ function buildUpdateBody(item) {
     recursion_limit: item.recursion_limit,
     tool_resources: item.tool_resources ?? undefined,
     tool_options: item.tool_options ?? undefined,
+    voice: item.voice ?? undefined,
   };
   return Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
 }
@@ -77,6 +78,7 @@ function buildCreateBody(item) {
     recursion_limit: item.recursion_limit,
     tool_resources: item.tool_resources ?? undefined,
     tool_options: item.tool_options ?? undefined,
+    voice: item.voice ?? undefined,
   };
   return Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
 }

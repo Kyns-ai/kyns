@@ -5,6 +5,9 @@ const { ErrorTypes } = require('librechat-data-provider');
 const denyRequest = require('./denyRequest');
 
 async function moderateText(req, res, next) {
+  if (req.kynsSafetyBlock?.blocked) {
+    return next();
+  }
   if (!isEnabled(process.env.OPENAI_MODERATION)) {
     return next();
   }

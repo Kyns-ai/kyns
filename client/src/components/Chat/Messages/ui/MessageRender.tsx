@@ -3,6 +3,8 @@ import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
 import { type TMessage } from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon } from '~/common';
+import { isKynsDeepMessage } from '~/components/Chat/Messages/Content/KynsMessageUtils';
+import { isKynsImageGeneration } from '~/components/Chat/Messages/Content/KynsImageGeneration';
 import MessageContent from '~/components/Chat/Messages/Content/MessageContent';
 import { useLocalize, useMessageActions, useContentMetadata } from '~/hooks';
 import PlaceholderRow from '~/components/Chat/Messages/ui/PlaceholderRow';
@@ -85,6 +87,25 @@ const MessageRender = memo(function MessageRender({
     ],
   );
 
+  const isKynsImageMessage = useMemo(
+    () =>
+      isKynsImageGeneration({
+        endpoint: msg?.endpoint ?? conversation?.endpoint,
+        model: msg?.model ?? conversation?.model,
+      }),
+    [conversation?.endpoint, conversation?.model, msg?.endpoint, msg?.model],
+  );
+  const isKynsDeepModeMessage = useMemo(
+    () =>
+      isKynsDeepMessage({
+        endpoint: msg?.endpoint ?? conversation?.endpoint,
+        spec: conversation?.spec,
+        sender: msg?.sender,
+        modelLabel: conversation?.modelLabel,
+      }),
+    [conversation?.endpoint, conversation?.modelLabel, conversation?.spec, msg?.endpoint, msg?.sender],
+  );
+
   const { hasParallelContent } = useContentMetadata(msg);
   const messageId = msg?.messageId ?? '';
   const messageContextValue = useMemo(
@@ -94,9 +115,16 @@ const MessageRender = memo(function MessageRender({
       isExpanded: false as const,
       isSubmitting: effectiveIsSubmitting,
       conversationId: conversation?.conversationId,
-      isCharacterMessage: !!agent && !msg.isCreatedByUser,
+      isCharacterMessage: !!agent && !(msg?.isCreatedByUser ?? false),
     }),
-    [messageId, conversation?.conversationId, effectiveIsSubmitting, isLatestMessage, agent, msg.isCreatedByUser],
+    [
+      messageId,
+      conversation?.conversationId,
+      effectiveIsSubmitting,
+      isLatestMessage,
+      agent,
+      msg?.isCreatedByUser,
+    ],
   );
 
   if (!msg) {
@@ -161,6 +189,8 @@ const MessageRender = memo(function MessageRender({
                 isLast={isLast}
                 text={msg.text || ''}
                 message={msg}
+                isKynsImageMessage={isKynsImageMessage}
+                isKynsDeepMessage={isKynsDeepModeMessage}
                 enterEdit={enterEdit}
                 error={!!(msg.error ?? false)}
                 isSubmitting={effectiveIsSubmitting}

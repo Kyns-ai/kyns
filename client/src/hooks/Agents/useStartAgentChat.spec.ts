@@ -6,6 +6,7 @@ import { createElement } from 'react';
 import type { ReactNode } from 'react';
 import useStartAgentChat from './useStartAgentChat';
 import { useChatContext } from '~/Providers';
+import useNavigateToConvo from '~/hooks/Conversations/useNavigateToConvo';
 import useDefaultConvo from '~/hooks/Conversations/useDefaultConvo';
 import useLocalize from '~/hooks/useLocalize';
 import { clearMessagesCache } from '~/utils';
@@ -15,6 +16,11 @@ jest.mock('~/Providers', () => ({
 }));
 
 jest.mock('~/hooks/Conversations/useDefaultConvo', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
+
+jest.mock('~/hooks/Conversations/useNavigateToConvo', () => ({
   __esModule: true,
   default: jest.fn(),
 }));
@@ -31,6 +37,7 @@ jest.mock('~/utils', () => ({
 describe('useStartAgentChat', () => {
   const mockNewConversation = jest.fn();
   const mockGetDefaultConversation = jest.fn();
+  const mockNavigateToConvo = jest.fn();
   const agent = {
     id: 'agent-123',
     name: 'Agent 123',
@@ -50,6 +57,7 @@ describe('useStartAgentChat', () => {
       newConversation: mockNewConversation,
     });
     (useDefaultConvo as jest.Mock).mockReturnValue(mockGetDefaultConversation);
+    (useNavigateToConvo as jest.Mock).mockReturnValue({ navigateToConvo: mockNavigateToConvo });
     (useLocalize as jest.Mock).mockImplementation(
       () => (key: string, values?: Record<string, string>) => {
         if (key === 'com_agents_chat_with') {
@@ -133,5 +141,57 @@ describe('useStartAgentChat', () => {
         title: 'Chat with Agent 123',
       },
     });
+  });
+
+  it('reuses the latest existing conversation for the same agent', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
+
+    queryClient.setQueryData([QueryKeys.allConversations], {
+      pageParams: [undefined],
+      pages: [
+        {
+          nextCursor: null,
+          conversations: [
+            {
+              conversationId: 'agent-convo-2',
+              endpoint: EModelEndpoint.agents,
+              agent_id: agent.id,
+              updatedAt: '2026-03-13T02:00:00.000Z',
+            },
+            {
+              conversationId: 'agent-convo-1',
+              endpoint: EModelEndpoint.agents,
+              agent_id: agent.id,
+              updatedAt: '2026-03-12T02:00:00.000Z',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { result } = renderHook(() => useStartAgentChat(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    act(() => {
+      result.current(agent);
+    });
+
+    expect(mockNavigateToConvo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: 'agent-convo-2',
+        agent_id: agent.id,
+      }),
+      {
+        currentConvoId: 'existing-convo',
+        resetLatestMessage: false,
+      },
+    );
+    expect(mockNewConversation).not.toHaveBeenCalled();
+    expect(clearMessagesCache).not.toHaveBeenCalled();
   });
 });

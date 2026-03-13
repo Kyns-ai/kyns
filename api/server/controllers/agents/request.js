@@ -1,5 +1,5 @@
 const { logger } = require('@librechat/data-schemas');
-const { Constants, ViolationTypes } = require('librechat-data-provider');
+const { Constants, ViolationTypes, ContentTypes, getResponseSender } = require('librechat-data-provider');
 const {
   sendEvent,
   getViolationInfo,
@@ -12,7 +12,12 @@ const {
 const { disposeClient, clientRegistry, requestDataMap } = require('~/server/cleanup');
 const { handleAbortError } = require('~/server/middleware');
 const { logViolation } = require('~/cache');
-const { saveMessage } = require('~/models');
+const { saveMessage, saveConvo } = require('~/models');
+const {
+  BLOCKED_REQUEST_RESPONSE,
+  BLOCKED_USER_PLACEHOLDER,
+} = require('~/server/services/safety/kynsPlatform');
+const { trackRunpodChatActivity } = require('~/server/services/runpodIdleStop');
 
 function createCloseHandler(abortController) {
   return function (manual) {
@@ -30,6 +35,98 @@ function createCloseHandler(abortController) {
     abortController.abort();
     logger.debug('[AgentController] Request aborted on close');
   };
+}
+
+async function emitBlockedSafetyResponse({
+  req,
+  res,
+  userId,
+  endpointOption,
+  text,
+  reason,
+  parentMessageId,
+  conversationId,
+}) {
+  const userMessageId = req.body?.messageId ?? crypto.randomUUID();
+  const responseMessageId = req.body?.responseMessageId ?? crypto.randomUUID();
+  const sender = getResponseSender(req.body);
+  const model =
+    endpointOption?.model_parameters?.model ?? endpointOption?.modelOptions?.model ?? undefined;
+  const userMessage = {
+    sender: 'User',
+    messageId: userMessageId,
+    parentMessageId,
+    conversationId,
+    isCreatedByUser: true,
+    text,
+  };
+  const storedUserMessage = {
+    ...userMessage,
+    text: BLOCKED_USER_PLACEHOLDER,
+    endpoint: endpointOption.endpoint,
+    user: userId,
+  };
+  const responseMessage = {
+    sender,
+    messageId: responseMessageId,
+    parentMessageId: userMessageId,
+    conversationId,
+    isCreatedByUser: false,
+    text: BLOCKED_REQUEST_RESPONSE,
+    content: [{ type: ContentTypes.TEXT, text: BLOCKED_REQUEST_RESPONSE }],
+    unfinished: false,
+    error: false,
+    endpoint: endpointOption.endpoint,
+    model,
+    user: userId,
+    agent_id: endpointOption.agent_id,
+    spec: endpointOption.spec,
+    iconURL: endpointOption.iconURL,
+  };
+
+  logger.warn('[AgentChat] Blocked request by KYNS safety filter', {
+    reason,
+    userId,
+    conversationId,
+    endpoint: endpointOption.endpoint,
+  });
+
+  try {
+    await saveMessage(req, storedUserMessage, {
+      context: 'api/server/controllers/agents/request.js - blocked user message',
+    });
+    await saveMessage(req, responseMessage, {
+      context: 'api/server/controllers/agents/request.js - blocked response message',
+    });
+
+    const conversation = await saveConvo(
+      req,
+      {
+        conversationId,
+        endpoint: endpointOption.endpoint,
+        endpointType: endpointOption.endpointType,
+        promptPrefix: req.body?.promptPrefix,
+        model,
+        modelLabel: endpointOption.modelLabel,
+        agent_id: endpointOption.agent_id,
+        spec: endpointOption.spec,
+        iconURL: endpointOption.iconURL,
+      },
+      { context: 'api/server/controllers/agents/request.js - blocked response conversation' },
+    );
+
+    return res.json({
+      final: true,
+      blocked: true,
+      conversation,
+      title: conversation?.title,
+      requestMessage: sanitizeMessageForTransmit(userMessage),
+      responseMessage: sanitizeMessageForTransmit(responseMessage),
+    });
+  } catch (error) {
+    logger.error('[AgentChat] Failed to emit blocked safety response', error);
+    return res.status(500).json({ error: error.message || 'Failed to emit blocked response' });
+  }
 }
 
 /**
@@ -56,6 +153,22 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
   } = req.body;
 
   const userId = req.user.id;
+  const conversationId =
+    !reqConversationId || reqConversationId === 'new' ? crypto.randomUUID() : reqConversationId;
+
+  if (req.kynsSafetyBlock?.blocked) {
+    await emitBlockedSafetyResponse({
+      req,
+      res,
+      userId,
+      endpointOption,
+      text,
+      reason: req.kynsSafetyBlock.reason,
+      parentMessageId: parentMessageId ?? Constants.NO_PARENT,
+      conversationId,
+    });
+    return;
+  }
 
   const { allowed, pendingRequests, limit } = await checkAndIncrementPendingRequest(userId);
   if (!allowed) {
@@ -64,10 +177,10 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     return res.status(429).json(violationInfo);
   }
 
+  const releaseRunpodActivity = trackRunpodChatActivity(endpointOption);
+
   // Generate conversationId upfront if not provided - streamId === conversationId always
   // Treat "new" as a placeholder that needs a real UUID (frontend may send "new" for new convos)
-  const conversationId =
-    !reqConversationId || reqConversationId === 'new' ? crypto.randomUUID() : reqConversationId;
   const streamId = conversationId;
 
   let client = null;
@@ -165,6 +278,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     if (job.abortController.signal.aborted) {
       GenerationJobManager.completeJob(streamId, 'Request aborted during initialization');
       await decrementPendingRequest(userId);
+      releaseRunpodActivity();
       return;
     }
 
@@ -394,6 +508,8 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
         // Don't continue to title generation after error/abort
         return;
+      } finally {
+        releaseRunpodActivity();
       }
     };
 
@@ -406,6 +522,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       await decrementPendingRequest(userId);
     });
   } catch (error) {
+    releaseRunpodActivity();
     logger.error('[ResumableAgentController] Initialization error:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: error.message || 'Failed to start generation' });

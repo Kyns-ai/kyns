@@ -290,6 +290,15 @@ const Conversations: FC<ConversationsProps> = ({
     }
   }, [cache, containerRef]);
 
+  const resetListViewport = useCallback(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    containerRef.current.scrollToRow(0);
+    containerRef.current.scrollToPosition(0);
+  }, [containerRef]);
+
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
       clearFavoritesCache();
@@ -298,11 +307,18 @@ const Conversations: FC<ConversationsProps> = ({
   }, [favorites.length, isFavoritesLoading, clearFavoritesCache]);
 
   useEffect(() => {
-    cache.clearAll();
-    if (containerRef.current && 'recomputeRowHeights' in containerRef.current) {
-      (containerRef.current as unknown as { recomputeRowHeights: (idx: number) => void }).recomputeRowHeights(0);
-    }
-  }, [activeTab, cache, containerRef]);
+    const frameId = requestAnimationFrame(() => {
+      cache.clearAll();
+      resetListViewport();
+      if (containerRef.current && 'recomputeRowHeights' in containerRef.current) {
+        (
+          containerRef.current as unknown as { recomputeRowHeights: (idx: number) => void }
+        ).recomputeRowHeights(0);
+      }
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [activeTab, cache, containerRef, resetListViewport]);
 
   const rowRenderer = useCallback(
     ({ index, key, parent, style }) => {

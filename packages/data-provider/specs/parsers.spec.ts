@@ -3,6 +3,7 @@ import {
   parseConvo,
   parseCompactConvo,
   parseTextParts,
+  extractDialogueForTTS,
   extractThinkingContent,
 } from '../src/parsers';
 import { specialVariables } from '../src/config';
@@ -572,6 +573,24 @@ describe('parseTextParts', () => {
     expect(extracted.regularContent).toBe('437');
   });
 
+  test('should extract markdown-emphasized thinking and final answer headings', () => {
+    const extracted = extractThinkingContent(
+      '**Thinking Process:**\n\n1. Analyze\n2. Decide\n\n**Final Answer:** 437',
+    );
+
+    expect(extracted.thinkingContent).toBe('1. Analyze\n2. Decide');
+    expect(extracted.regularContent).toBe('437');
+  });
+
+  test('should extract markdown heading thinking and final answer sections', () => {
+    const extracted = extractThinkingContent(
+      '### Thinking Process\n\n1. Analyze\n2. Decide\n\n## Final Answer\n437',
+    );
+
+    expect(extracted.thinkingContent).toBe('1. Analyze\n2. Decide');
+    expect(extracted.regularContent).toBe('437');
+  });
+
   test('should include think parts by default', () => {
     const parts: TMessageContentParts[] = [
       { type: ContentTypes.TEXT, text: 'Answer:' },
@@ -639,5 +658,32 @@ describe('parseTextParts', () => {
       { type: ContentTypes.TEXT, text: 'World' },
     ];
     expect(parseTextParts(parts)).toBe('Hello World');
+  });
+});
+
+describe('extractDialogueForTTS', () => {
+  test('should return only quoted speech when dialogue exists', () => {
+    const text =
+      '*Ela sorri de lado.* "Oi, amor." *Passa a mão no teu braço.* "Como foi teu dia?"';
+
+    expect(extractDialogueForTTS(text)).toBe('Oi, amor. Como foi teu dia?');
+  });
+
+  test('should support smart quotes', () => {
+    const text = '*Ela ri baixo.* “Vem cá.” *Te encara por um segundo.* “Eu tava com saudade.”';
+
+    expect(extractDialogueForTTS(text)).toBe('Vem cá. Eu tava com saudade.');
+  });
+
+  test('should fall back to sanitized text when no quoted speech exists', () => {
+    const text = '*Ela sorri de lado e senta na tua frente.*';
+
+    expect(extractDialogueForTTS(text)).toBe('');
+  });
+
+  test('should ignore thinking blocks before extracting dialogue', () => {
+    const text = '<think>private reasoning</think>*Ela se aproxima.* "Agora me escuta."';
+
+    expect(extractDialogueForTTS(text)).toBe('Agora me escuta.');
   });
 });

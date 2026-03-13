@@ -1,7 +1,11 @@
 // client/src/hooks/Audio/useTTSExternal.ts
 import { useRef, useEffect, useState } from 'react';
 import { useRecoilState, useRecoilValue } from 'recoil';
-import { extractThinkingContent, parseTextParts, sanitizeTextForTTS } from 'librechat-data-provider';
+import {
+  extractDialogueForTTS,
+  extractThinkingContent,
+  parseTextParts,
+} from 'librechat-data-provider';
 import type { TMessageContentParts } from 'librechat-data-provider';
 import useTextToSpeechExternal from '~/hooks/Input/useTextToSpeechExternal';
 import usePauseGlobalAudio from '~/hooks/Audio/usePauseGlobalAudio';
@@ -64,7 +68,7 @@ const useTTSExternal = (props?: TUseTextToSpeech) => {
       typeof messageContent === 'string'
         ? extractThinkingContent(messageContent).regularContent
         : parseTextParts(messageContent, true);
-    return sanitizeTextForTTS(raw);
+    return extractDialogueForTTS(raw);
   };
 
   const handleMouseDown = () => {

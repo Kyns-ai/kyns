@@ -59,6 +59,7 @@ const { getRoleByName } = require('~/models/Role');
 const { loadAgent } = require('~/models/Agent');
 const { getMCPManager } = require('~/config');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
+const { prependKynsMasterPrompt, KynsResponseFilteredError } = require('~/server/services/safety/kynsPlatform');
 const db = require('~/models');
 
 const DEFAULT_AGENT_RECURSION_LIMIT = 16;
@@ -321,7 +322,8 @@ class AgentClient extends BaseClient {
         .filter(Boolean)
         .join('\n')
         .trim();
-      agent.instructions = baseInstructions;
+      agent.instructions = prependKynsMasterPrompt(baseInstructions);
+      agent.additional_instructions = '';
       return agent;
     };
 
@@ -687,6 +689,8 @@ class AgentClient extends BaseClient {
       messageId,
       streamId,
       conversationId,
+      agentId: this.options.agent.id,
+      agentName: this.options.agent.name,
       memoryMethods: {
         setMemory: db.setMemory,
         deleteMemory: db.deleteMemory,
@@ -910,6 +914,7 @@ class AgentClient extends BaseClient {
     const port = process.env.PORT || 3080;
     const spec = this.options.spec ?? body.spec ?? '';
     const model = spec.includes('turbo') ? 'zimage' : 'flux2klein';
+    const requestUserId = this.user ?? this.options.req?.user?.id;
     logger.info(`[KYNSImage] spec=${spec} → model=${model}`);
 
     const response = await fetch(`http://127.0.0.1:${port}/api/image-proxy/chat/completions`, {
@@ -917,6 +922,7 @@ class AgentClient extends BaseClient {
       headers: {
         'Content-Type': 'application/json',
         Authorization: 'Bearer kyns-image-internal',
+        'X-KYNS-User-ID': requestUserId != null ? String(requestUserId) : '',
       },
       body: JSON.stringify({
         messages: [{ role: 'user', content: userText }],
@@ -1218,14 +1224,23 @@ class AgentClient extends BaseClient {
         });
       }
     } catch (err) {
-      logger.error(
-        '[api/server/controllers/agents/client.js #sendCompletion] Operation aborted',
-        err,
-      );
-      if (err?.stack) {
+      if (err instanceof KynsResponseFilteredError) {
+        logger.warn('[AgentClient] Response blocked by KYNS safety filter', {
+          reason: err.reason,
+          userId: this.user ?? this.options.req.user?.id,
+          conversationId: this.conversationId,
+          messageId: this.responseMessageId,
+        });
+      } else {
+        logger.error(
+          '[api/server/controllers/agents/client.js #sendCompletion] Operation aborted',
+          err,
+        );
+      }
+      if (!(err instanceof KynsResponseFilteredError) && err?.stack) {
         logger.error('[sendCompletion] Stack trace:', err.stack);
       }
-      if (!abortController.signal.aborted) {
+      if (!(err instanceof KynsResponseFilteredError) && !abortController.signal.aborted) {
         logger.error(
           '[api/server/controllers/agents/client.js #sendCompletion] Unhandled error type',
           err,

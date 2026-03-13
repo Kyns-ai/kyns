@@ -1,9 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const express = require('express');
 const sharp = require('sharp');
+const { limiterCache } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const paths = require('~/config/paths');
 
@@ -11,6 +13,8 @@ const PROXY_API_KEY = process.env.IMAGE_PROXY_KEY || 'kyns-image-internal';
 const POLL_INTERVAL_MS = 5000;
 const POLL_TIMEOUT_MS = 300_000;
 const NO_WORKER_CANCEL_MS = 240_000;
+const IMAGE_DAILY_LIMIT = 10;
+const IMAGE_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const WATERMARK_TEXT = 'kyns.ai';
 
 const router = express.Router();
@@ -30,18 +34,36 @@ async function addWatermark(buffer) {
   const meta = await sharp(buffer).metadata();
   const w = meta.width || 1024;
   const h = meta.height || 1024;
-  const fontSize = Math.max(16, Math.floor(w / 45));
-  const margin = 14;
-  const textW = Math.ceil(WATERMARK_TEXT.length * fontSize * 0.58);
-  const x = w - textW - margin;
+  const fontSize = Math.max(18, Math.floor(w / 34));
+  const margin = Math.max(16, Math.floor(w / 64));
+  const x = w - margin;
   const y = h - margin;
+  const fontFamily = 'DejaVu Sans, sans-serif';
 
   const svg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
-    <text x="${x + 1}" y="${y + 1}" font-family="Arial,sans-serif" font-size="${fontSize}" font-weight="bold" fill="rgba(0,0,0,0.45)">${WATERMARK_TEXT}</text>
-    <text x="${x}" y="${y}" font-family="Arial,sans-serif" font-size="${fontSize}" font-weight="bold" fill="rgba(255,255,255,0.65)">${WATERMARK_TEXT}</text>
+    <text x="${x + 1}" y="${y + 1}" text-anchor="end" font-family="${fontFamily}" font-size="${fontSize}" font-weight="600" fill="rgba(0,0,0,0.42)">${WATERMARK_TEXT}</text>
+    <text x="${x}" y="${y}" text-anchor="end" font-family="${fontFamily}" font-size="${fontSize}" font-weight="600" fill="rgba(255,255,255,0.82)">${WATERMARK_TEXT}</text>
   </svg>`;
 
-  return sharp(buffer).composite([{ input: Buffer.from(svg), top: 0, left: 0 }]).png().toBuffer();
+  return sharp(buffer)
+    .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
+    .png()
+    .toBuffer();
+}
+
+function getRequesterUserId(req) {
+  const headerUserId = req.headers['x-kyns-user-id'];
+  if (Array.isArray(headerUserId)) {
+    return headerUserId[0] ?? null;
+  }
+  if (typeof headerUserId === 'string' && headerUserId.length > 0) {
+    return headerUserId;
+  }
+  return req.user?.id ?? req.body?.userId ?? null;
+}
+
+function makeDailyLimitMessage() {
+  return `Você atingiu o limite de ${IMAGE_DAILY_LIMIT} imagens por dia. O limite reinicia à meia-noite (UTC).`;
 }
 
 async function pollRunpodJob(endpointId, jobId, apiKey) {
@@ -67,9 +89,12 @@ async function pollRunpodJob(endpointId, jobId, apiKey) {
           .get(healthUrl, { headers: { Authorization: `Bearer ${apiKey}` } })
           .catch(() => ({ data: { workers: {} } }));
         const w = health.data?.workers ?? {};
-        const hasWorkers = (w.idle ?? 0) + (w.initializing ?? 0) + (w.ready ?? 0) + (w.running ?? 0) > 0;
+        const hasWorkers =
+          (w.idle ?? 0) + (w.initializing ?? 0) + (w.ready ?? 0) + (w.running ?? 0) > 0;
         if (!hasWorkers) {
-          await axios.post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` } }).catch(() => {});
+          await axios
+            .post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` } })
+            .catch(() => {});
           throw new Error(
             'Sem GPU disponível agora. O servidor de imagem está aquecendo — tente novamente em 1-2 minutos.',
           );
@@ -77,20 +102,28 @@ async function pollRunpodJob(endpointId, jobId, apiKey) {
       }
     }
   }
-  await axios.post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` } }).catch(() => {});
+  await axios
+    .post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` } })
+    .catch(() => {});
   throw new Error('Timeout: geração de imagem demorou mais de 5 minutos.');
 }
 
 function parseImageRequest(messages, requestedModel) {
-  const lastUser = [...(messages || [])].filter(Boolean).reverse().find((m) => m.role === 'user');
+  const lastUser = [...(messages || [])]
+    .filter(Boolean)
+    .reverse()
+    .find((m) => m.role === 'user');
   const content = typeof lastUser?.content === 'string' ? lastUser.content : '';
   const isPortrait = /portrait|vertical|tall/i.test(content);
   const isLandscape = /landscape|horizontal|wide/i.test(content);
 
   const validModels = new Set(['flux2klein', 'zimage']);
-  const model = validModels.has(requestedModel) ? requestedModel
-    : /zimage|fast|rápido|rapido|quick|turbo/i.test(content) ? 'zimage'
-    : 'flux2klein';
+  let model = 'flux2klein';
+  if (validModels.has(requestedModel)) {
+    model = requestedModel;
+  } else if (/zimage|fast|rápido|rapido|quick|turbo/i.test(content)) {
+    model = 'zimage';
+  }
 
   const width = Math.round((isLandscape ? 1792 : 1024) / 8) * 8;
   const height = Math.round((isPortrait ? 1792 : 1024) / 8) * 8;
@@ -117,89 +150,106 @@ function makeResponse(content) {
   };
 }
 
+const imageGenerationLimiter = rateLimit({
+  windowMs: IMAGE_DAILY_WINDOW_MS,
+  max: IMAGE_DAILY_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: true,
+  skip: (req) => !getRequesterUserId(req),
+  keyGenerator: (req) => String(getRequesterUserId(req) ?? req.ip),
+  requestWasSuccessful: (_req, res) => res.locals.imageGenerationCountable === true,
+  store: limiterCache('image_generation_user_limiter'),
+  handler: (_req, res) => res.status(200).json(makeResponse(makeDailyLimitMessage())),
+});
+
 async function imageRequestHandler(req, res) {
   try {
-  const authHeader = req.headers.authorization || '';
-  if (!authHeader.includes(PROXY_API_KEY)) {
-    return res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_error' } });
-  }
+    const authHeader = req.headers.authorization || '';
+    if (!authHeader.includes(PROXY_API_KEY)) {
+      return res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_error' } });
+    }
 
-  const apiKey = getRunpodKey();
-  const endpointId = getEndpointId();
+    const apiKey = getRunpodKey();
+    const endpointId = getEndpointId();
 
-  if (!apiKey || !endpointId) {
-    logger.error('[imageProxy] Missing RunPod credentials');
-    return res.json(makeResponse('Geração de imagens não configurada. Contate o administrador.'));
-  }
+    if (!apiKey || !endpointId) {
+      logger.error('[imageProxy] Missing RunPod credentials');
+      return res.json(makeResponse('Geração de imagens não configurada. Contate o administrador.'));
+    }
 
-  const params = parseImageRequest(req.body.messages, req.body.model);
+    const params = parseImageRequest(req.body.messages, req.body.model);
 
-  if (!params.prompt || params.prompt.trim().length < 3) {
-    return res.json(makeResponse('Por favor, descreva a imagem que deseja gerar.'));
-  }
+    if (!params.prompt || params.prompt.trim().length < 3) {
+      return res.json(makeResponse('Por favor, descreva a imagem que deseja gerar.'));
+    }
 
-  let jobId;
-  try {
-    const runResp = await axios.post(
-      `https://api.runpod.ai/v2/${endpointId}/run`,
-      { input: params },
-      { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } },
-    );
-    jobId = runResp.data.id;
-    logger.info(`[imageProxy] RunPod job submitted: ${jobId}`);
-  } catch (err) {
-    logger.error('[imageProxy] Failed to submit RunPod job:', err?.response?.data ?? err.message);
-    return res.json(makeResponse('Erro ao enviar requisição de imagem. Tente novamente.'));
-  }
+    let jobId;
+    try {
+      const runResp = await axios.post(
+        `https://api.runpod.ai/v2/${endpointId}/run`,
+        { input: params },
+        { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } },
+      );
+      jobId = runResp.data.id;
+      logger.info(`[imageProxy] RunPod job submitted: ${jobId}`);
+    } catch (err) {
+      logger.error('[imageProxy] Failed to submit RunPod job:', err?.response?.data ?? err.message);
+      return res.json(makeResponse('Erro ao enviar requisição de imagem. Tente novamente.'));
+    }
 
-  let output;
-  try {
-    output = await pollRunpodJob(endpointId, jobId, apiKey);
-  } catch (err) {
-    logger.error('[imageProxy] RunPod polling failed:', err.message);
-    const isModelMissing = err.message.includes('No image model available') || err.message.includes('model');
-    const isNoGpu = err.message.includes('Sem GPU') || err.message.includes('cancelada');
-    const userMsg = isModelMissing
-      ? 'O servidor de imagem está reiniciando. Aguarde 2-3 minutos e tente novamente.'
-      : isNoGpu
-        ? err.message
-        : `Erro ao gerar imagem: ${err.message}`;
-    return res.json(makeResponse(userMsg));
-  }
+    let output;
+    try {
+      output = await pollRunpodJob(endpointId, jobId, apiKey);
+    } catch (err) {
+      logger.error('[imageProxy] RunPod polling failed:', err.message);
+      const isModelMissing =
+        err.message.includes('No image model available') || err.message.includes('model');
+      const isNoGpu = err.message.includes('Sem GPU') || err.message.includes('cancelada');
 
-  const base64 = output?.image;
-  if (!base64) {
-    logger.error('[imageProxy] No image in RunPod output:', output);
-    return res.json(makeResponse('O servidor não retornou a imagem. Tente novamente.'));
-  }
+      let userMsg = `Erro ao gerar imagem: ${err.message}`;
+      if (isModelMissing) {
+        userMsg = 'O servidor de imagem está reiniciando. Aguarde 2-3 minutos e tente novamente.';
+      } else if (isNoGpu) {
+        userMsg = err.message;
+      }
 
-  const fileId = uuidv4();
-  const filename = `${fileId}.png`;
+      return res.json(makeResponse(userMsg));
+    }
 
-  try {
-    const generatedDir = ensureGeneratedDir();
-    let imageBuffer = Buffer.from(base64, 'base64');
-    imageBuffer = await addWatermark(imageBuffer);
-    fs.writeFileSync(path.join(generatedDir, filename), imageBuffer);
-    logger.info(`[imageProxy] Image saved: generated/${filename}`);
-  } catch (err) {
-    logger.error('[imageProxy] Failed to save image:', err.message);
-    return res.json(makeResponse(`Imagem gerada mas erro ao salvar: ${err.message}`));
-  }
+    const base64 = output?.image;
+    if (!base64) {
+      logger.error('[imageProxy] No image in RunPod output:', output);
+      return res.json(makeResponse('O servidor não retornou a imagem. Tente novamente.'));
+    }
 
-  const serverDomain = process.env.DOMAIN_SERVER || 'http://localhost:3080';
-  const imageUrl = `${serverDomain}/images/generated/${filename}`;
-  const modelLabel = params.model === 'flux2klein' ? 'FLUX.2 Klein 9B' : 'Z-Image Turbo';
-  const content = `![Imagem gerada](${imageUrl})\n\n_Gerada por KYNS Image · ${modelLabel} · ${params.width}×${params.height}px_`;
+    const fileId = uuidv4();
+    const filename = `${fileId}.png`;
 
-  return res.json(makeResponse(content));
+    try {
+      const generatedDir = ensureGeneratedDir();
+      let imageBuffer = Buffer.from(base64, 'base64');
+      imageBuffer = await addWatermark(imageBuffer);
+      fs.writeFileSync(path.join(generatedDir, filename), imageBuffer);
+      res.locals.imageGenerationCountable = true;
+      logger.info(`[imageProxy] Image saved: generated/${filename}`);
+    } catch (err) {
+      logger.error('[imageProxy] Failed to save image:', err.message);
+      return res.json(makeResponse(`Imagem gerada mas erro ao salvar: ${err.message}`));
+    }
+
+    const serverDomain = process.env.DOMAIN_SERVER || 'http://localhost:3080';
+    const imageUrl = `${serverDomain}/images/generated/${filename}`;
+    const content = `![Imagem gerada](${imageUrl})\n\n_Gerada por KYNS Image · ${params.width}×${params.height}px_`;
+
+    return res.json(makeResponse(content));
   } catch (err) {
     logger.error('[imageProxy] Unhandled error:', err.message);
     return res.json(makeResponse('Erro inesperado na geração de imagem. Tente novamente.'));
   }
 }
 
-router.post('/chat/completions', imageRequestHandler);
-router.post('/v1/chat/completions', imageRequestHandler);
+router.post('/chat/completions', imageGenerationLimiter, imageRequestHandler);
+router.post('/v1/chat/completions', imageGenerationLimiter, imageRequestHandler);
 
 module.exports = router;
