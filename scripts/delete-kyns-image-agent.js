@@ -15,17 +15,27 @@ async function run() {
 
   const col = client.db('LibreChat').collection('agents');
 
-  const found = await col
-    .find({ name: /kyns.?image/i }, { projection: { _id: 1, name: 1, author: 1 } })
+  const all = await col
+    .find({}, { projection: { _id: 1, name: 1, author: 1, projectIds: 1 } })
     .toArray();
 
+  console.log(`Total de agentes no banco: ${all.length}`);
+  all.forEach((a) =>
+    console.log(`  _id=${a._id}  name="${a.name}"  projects=${JSON.stringify(a.projectIds)}`),
+  );
+
+  const found = all.filter((a) => /kyns.?image|image.*kyns/i.test(a.name ?? ''));
+
   if (found.length === 0) {
-    console.log('Nenhum agente "Kyns Image" encontrado.');
+    console.log('\nNenhum agente com nome "Kyns Image" encontrado pelo regex.');
+    console.log('Procurando por "image" (case-insensitive)...');
+    const imageAgents = all.filter((a) => /image/i.test(a.name ?? ''));
+    imageAgents.forEach((a) => console.log(`  CANDIDATO: _id=${a._id}  name="${a.name}"`));
     await client.close();
     return;
   }
 
-  console.log(`Encontrados ${found.length} agente(s):`);
+  console.log(`\nEncontrados ${found.length} agente(s) para deletar:`);
   found.forEach((a) => console.log(`  _id=${a._id}  name="${a.name}"  author=${a.author}`));
 
   const result = await col.deleteMany({ _id: { $in: found.map((a) => a._id) } });
