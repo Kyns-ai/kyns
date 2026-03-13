@@ -13,26 +13,24 @@ async function run() {
   await client.connect();
   console.log('Conectado!');
 
-  const db = client.db('LibreChat');
+  const adminDb = client.db('admin');
+  const dbList = await adminDb.admin().listDatabases();
+  console.log('Todos os bancos de dados:');
+  dbList.databases.forEach((d) => console.log(` - ${d.name} (${d.sizeOnDisk} bytes)`));
 
-  const collections = await db.listCollections().toArray();
-  console.log('Coleções no banco:');
-  collections.forEach((c) => console.log(' -', c.name));
-
-  const agentCollections = collections.filter((c) =>
-    /agent|preset|character|assistant/i.test(c.name),
-  );
-  console.log('\nColeções candidatas (agent/preset/character/assistant):');
-
-  for (const colInfo of agentCollections) {
-    const col = db.collection(colInfo.name);
-    const docs = await col
-      .find({}, { projection: { _id: 1, name: 1, author: 1, projectIds: 1 } })
-      .toArray();
-    console.log(`\n[${colInfo.name}] — ${docs.length} doc(s):`);
-    docs.forEach((d) =>
-      console.log(`  _id=${d._id}  name="${d.name}"  projects=${JSON.stringify(d.projectIds)}`),
-    );
+  for (const dbInfo of dbList.databases) {
+    if (['admin', 'local', 'config'].includes(dbInfo.name)) continue;
+    const db = client.db(dbInfo.name);
+    const cols = await db.listCollections().toArray();
+    console.log(`\n[${dbInfo.name}] coleções:`, cols.map((c) => c.name).join(', '));
+    if (cols.some((c) => /agent/i.test(c.name))) {
+      const col = db.collection('agents');
+      const docs = await col
+        .find({}, { projection: { _id: 1, name: 1 } })
+        .toArray();
+      console.log(`  agents: ${docs.length} docs`);
+      docs.forEach((d) => console.log(`    _id=${d._id}  name="${d.name}"`));
+    }
   }
 
   await client.close();
