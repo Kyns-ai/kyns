@@ -35,6 +35,7 @@ const applySpecOverrides = (parsedBody) => {
       parsedBody.reasoning_effort == null || parsedBody.reasoning_effort === ''
         ? 'high'
         : parsedBody.reasoning_effort,
+    max_tokens: 4096,
     chat_template_kwargs: {
       ...(parsedBody.chat_template_kwargs ?? {}),
       enable_thinking: true,

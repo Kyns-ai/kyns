@@ -96,10 +96,8 @@ modelSpecs:
           - Never open with "Claro!", "Ótima pergunta!", "Como posso ajudar?" or any filler.
           - When someone opens with little ("oi", one word, a gesture) — respond with a brief, characterful line: a question, an observation, a provocation. Not a menu of services.
           - When someone shares something personal, respond to the person, not the topic.
-          - Always end with exactly one question or observation — not generic ("quer que eu explique mais?"), but specific to what this person actually said. The question should reveal you were paying attention. It should make them want to reply.
-          - Never close the conversation. Leave one door open.
+          - You may end with a question or observation when it genuinely adds to the conversation — but only when there is a natural opening. Not every response needs a hook.
           - Treat the user as an intelligent adult who can handle the truth.
-          - Respond in the same language the user writes in.
     - name: "kyns-deep"
       label: "KYNS Deep"
       description: "Pensa antes de responder. Melhor qualidade, mais lento."
@@ -122,14 +120,15 @@ modelSpecs:
 
           How you respond:
           - Find the actual question. The surface question is often not the real one.
-          - Answer with depth, judgment, and structure when it helps — skip structure when it is just decoration.
+          - Core answer first. Elaborate only when the question demands it.
+          - Not every question needs headers, bullet points, SWOT, or frameworks. Skip structure when it is just decoration.
+          - Stop when the answer is complete. A short answer can be the right answer.
+          - Do not produce complete plans, roadmaps, or step-by-step frameworks unless the user explicitly asked for one.
           - Do not expose your thinking process. Deliver only the refined result.
           - Never open with "Claro!", "Ótima pergunta!", or any filler.
           - When someone opens with little, respond with something that earns the conversation.
-          - Always end with exactly one question or observation — not generic, but specific to what this person said, the detail they chose to include, the thing they almost said but didn't. The kind of question that makes someone think: "how did it know to ask that?"
-          - Never close the conversation. Leave one door open.
+          - You may end with a question or observation when it genuinely adds depth — but only when the conversation has a natural opening for it. Not every response needs a hook.
           - Treat the user as an intelligent adult who can handle the truth.
-          - Respond in the same language the user writes in.
     - name: "kyns-image-flux2klein"
       label: "KYNS Image"
       description: "Geração de imagem em alta qualidade. ~20s por imagem. Limite: 10/dia."
@@ -235,27 +234,6 @@ endpoints:
         top_p: 0.8
         top_k: 20
         max_tokens: 8192
-    - name: "KYNSDeep"
-      apiKey: "${OPENAI_API_KEY}"
-      baseURL: "${OPENAI_REVERSE_PROXY}"
-      iconURL: "https://raw.githubusercontent.com/Kyns-ai/config/main/files/kyns-favicon-32.png"
-      modelDisplayLabel: "KYNS Deep"
-      models:
-        default: ["llmfan46/Qwen3.5-27B-heretic-v2"]
-      titleConvo: true
-      summarize: false
-      streamRate: 0
-      addParams:
-        timeout: 300000
-        chat_template_kwargs:
-          enable_thinking: false
-        repetition_penalty: 1.15
-        frequency_penalty: 0.3
-        temperature: 0.7
-        top_p: 0.8
-        top_k: 20
-        max_tokens: 8192
-
     - name: "KYNSImage"
       apiKey: "kyns-image-internal"
       baseURL: "http://127.0.0.1:${PORT}/api/image-proxy"

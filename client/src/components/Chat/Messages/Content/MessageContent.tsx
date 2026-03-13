@@ -20,7 +20,7 @@ import store from '~/store';
 const ERROR_CONNECTION_TEXT = 'Error connecting to server, try refreshing the page.';
 const DELAYED_ERROR_TIMEOUT = 5500;
 const UNFINISHED_DELAY = 250;
-const DEEP_LOADER_MIN_DURATION_MS = 2200;
+const DEEP_LOADER_MIN_DURATION_MS = 1500;
 
 const LoadingFallback = () => (
   <div className="text-message mb-[0.625rem] flex min-h-[20px] flex-col items-start gap-3 overflow-visible">
