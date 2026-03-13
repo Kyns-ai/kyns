@@ -197,16 +197,16 @@ function MediaPanel({
           src={src}
         />
       )}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/28 via-transparent to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/14 via-transparent to-transparent" />
       <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
         <div className="max-w-2xl">
           <span className="site-media-chip border-white/12 bg-black/22 text-white shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
             {label}
           </span>
-          <h3 className="site-display mt-5 text-3xl text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.55)] md:text-4xl">
+          <h3 className="site-display site-media-title mt-5 text-3xl md:text-4xl">
             {title}
           </h3>
-          <p className="mt-4 max-w-xl text-base leading-8 text-white/92 drop-shadow-[0_3px_14px_rgba(0,0,0,0.5)]">
+          <p className="site-media-description mt-4 max-w-xl text-base leading-8">
             {description}
           </p>
         </div>
@@ -284,8 +284,12 @@ export function SiteLayout() {
       <header className="site-nav-panel sticky top-0 z-50 border-b border-black/6">
         <div className="kyns-shell flex h-20 items-center justify-between gap-6">
           <Link className="site-link flex items-center gap-3" to="/">
-            <div className="flex size-11 items-center justify-center rounded-full border border-[#c8a86e]/35 bg-white/80 shadow-sm">
-              <span className="font-mono text-sm font-semibold tracking-[0.16em] text-[#b89555]">KY</span>
+            <div className="flex size-11 items-center justify-center overflow-hidden rounded-full border border-[#c8a86e]/35 bg-black shadow-sm">
+              <img
+                alt="KYNS logo"
+                className="h-full w-full object-cover"
+                src="/assets/kyns-logo-mark.png"
+              />
             </div>
             <div>
               <div className="font-mono text-xs uppercase tracking-[0.2em] text-[#8d8d8d]">κυνικός</div>
@@ -578,9 +582,9 @@ export function SiteHomePage() {
             <MediaPanel
               description="Uma biblioteca guarda inclusive o conhecimento perigoso. O problema nunca esteve nas estantes, mas no uso que cada pessoa faz do que encontra nelas."
               label="BIBLIOTECA"
-              src="/assets/kyns-library.png"
+              src="/assets/kyns-library-video.mp4"
               title="Toda biblioteca séria contém mais do que conforto."
-              type="image"
+              type="video"
             />
           </Reveal>
           <Reveal>
