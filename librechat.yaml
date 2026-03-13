@@ -130,6 +130,28 @@ modelSpecs:
           - Never close the conversation. Leave one door open.
           - Treat the user as an intelligent adult who can handle the truth.
           - Respond in the same language the user writes in.
+    - name: "kyns-image-flux2klein"
+      label: "KYNS Image"
+      description: "Geração de imagem em alta qualidade. ~20s por imagem. Limite: 10/dia."
+      iconURL: "https://raw.githubusercontent.com/Kyns-ai/config/main/files/kyns-favicon-32.png"
+      showIconInHeader: true
+      showIconInMenu: true
+      preset:
+        endpoint: "KYNSImage"
+        model: "flux2klein"
+        modelLabel: "KYNS Image"
+        greeting: "KYNS Image. Alta qualidade. Descreva a imagem:"
+    - name: "kyns-image-turbo"
+      label: "KYNS Image Turbo"
+      description: "Geração de imagem rápida para variações e testes. Limite: 10/dia."
+      iconURL: "https://raw.githubusercontent.com/Kyns-ai/config/main/files/kyns-favicon-32.png"
+      showIconInHeader: true
+      showIconInMenu: true
+      preset:
+        endpoint: "KYNSImage"
+        model: "zimage"
+        modelLabel: "KYNS Image Turbo"
+        greeting: "KYNS Image Turbo. Mais rápido. Descreva a imagem:"
 
 memory:
   disabled: false
