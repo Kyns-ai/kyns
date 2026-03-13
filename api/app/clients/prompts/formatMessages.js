@@ -2,6 +2,27 @@ const { ToolMessage } = require('@langchain/core/messages');
 const { EModelEndpoint, ContentTypes } = require('librechat-data-provider');
 const { HumanMessage, AIMessage, SystemMessage } = require('@langchain/core/messages');
 
+const createTextContentPart = (value) => ({
+  type: ContentTypes.TEXT,
+  [ContentTypes.TEXT]: value,
+});
+
+const normalizeAgentMessageContent = (content) => {
+  if (typeof content === 'string') {
+    return [createTextContentPart(content)];
+  }
+
+  if (Array.isArray(content)) {
+    return content.filter((part) => part != null && typeof part === 'object');
+  }
+
+  if (content == null) {
+    return [];
+  }
+
+  return [createTextContentPart(String(content))];
+};
+
 /**
  * Formats a message to OpenAI Vision API payload format.
  *
@@ -141,12 +162,27 @@ const formatFromLangChain = (message) => {
 const formatAgentMessages = (payload) => {
   const messages = [];
 
-  for (const message of payload) {
-    if (typeof message.content === 'string') {
-      message.content = [{ type: ContentTypes.TEXT, [ContentTypes.TEXT]: message.content }];
+  for (const rawMessage of payload) {
+    if (rawMessage == null || typeof rawMessage !== 'object') {
+      continue;
     }
+
+    const message = {
+      ...rawMessage,
+    };
+
+    if (message.role === 'assistant') {
+      message.content = normalizeAgentMessageContent(message.content);
+    } else if (typeof message.content !== 'string' && !Array.isArray(message.content)) {
+      message.content = message.content == null ? '' : String(message.content);
+    }
+
     if (message.role !== 'assistant') {
       messages.push(formatMessage({ message, langChain: true }));
+      continue;
+    }
+
+    if (!Array.isArray(message.content) || message.content.length === 0) {
       continue;
     }
 
@@ -155,6 +191,10 @@ const formatAgentMessages = (payload) => {
 
     let hasReasoning = false;
     for (const part of message.content) {
+      if (part == null || typeof part !== 'object' || typeof part.type !== 'string') {
+        continue;
+      }
+
       if (part.type === ContentTypes.TEXT && part.tool_call_ids) {
         /*
         If there's pending content, it needs to be aggregated as a single string to prepare for tool calls.
@@ -176,7 +216,7 @@ const formatAgentMessages = (payload) => {
 
         // Create a new AIMessage with this text and prepare for tool calls
         lastAIMessage = new AIMessage({
-          content: part.text || '',
+          content: part[ContentTypes.TEXT] ?? part.text ?? '',
         });
 
         messages.push(lastAIMessage);

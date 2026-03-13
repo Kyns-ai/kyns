@@ -22,6 +22,25 @@ describe('formatAgentMessages', () => {
     expect(result[0]).toBeInstanceOf(SystemMessage);
   });
 
+  it('should skip nullish payload entries instead of returning undefined messages', () => {
+    const payload = [
+      undefined,
+      null,
+      { role: 'user', content: 'Hello' },
+      {
+        role: 'assistant',
+        content: [{ type: ContentTypes.TEXT, [ContentTypes.TEXT]: 'Hi there!' }],
+      },
+    ];
+
+    const result = formatAgentMessages(payload);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBeInstanceOf(HumanMessage);
+    expect(result[1]).toBeInstanceOf(AIMessage);
+    expect(result.every(Boolean)).toBe(true);
+  });
+
   it('should format messages with content arrays', () => {
     const payload = [
       {
@@ -78,6 +97,31 @@ describe('formatAgentMessages', () => {
     expect(result).toHaveLength(1);
     expect(result[0]).toBeInstanceOf(AIMessage);
     expect(result[0].content).toHaveLength(2);
+  });
+
+  it('should ignore malformed assistant content parts', () => {
+    const payload = [
+      {
+        role: 'assistant',
+        content: [
+          undefined,
+          { type: ContentTypes.TEXT, [ContentTypes.TEXT]: 'Part 1' },
+          null,
+          { foo: 'bar' },
+          { type: ContentTypes.ERROR, [ContentTypes.ERROR]: 'Something failed' },
+          { type: ContentTypes.TEXT, [ContentTypes.TEXT]: 'Part 2' },
+        ],
+      },
+    ];
+
+    const result = formatAgentMessages(payload);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBeInstanceOf(AIMessage);
+    expect(result[0].content).toEqual([
+      { type: ContentTypes.TEXT, [ContentTypes.TEXT]: 'Part 1' },
+      { type: ContentTypes.TEXT, [ContentTypes.TEXT]: 'Part 2' },
+    ]);
   });
 
   it('should throw an error for invalid tool call structure', () => {
