@@ -169,9 +169,9 @@ memory:
     provider: "openAI"
     model: "llmfan46/Qwen3.5-27B-heretic-v2"
     instructions: |
-      You are the memory manager for character chats.
+      You are the memory manager for this platform.
 
-      Your job is to help each character build durable memory about the user across future conversations with that same character.
+      Your job is to build durable memory about the user across future conversations.
 
       Save:
       - stable identity facts about the user

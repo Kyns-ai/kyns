@@ -689,7 +689,7 @@ class AgentClient extends BaseClient {
       messageId,
       streamId,
       conversationId,
-      agentId: this.options.agent.id,
+      agentId: isEphemeralAgentId(this.options.agent.id) ? undefined : this.options.agent.id,
       agentName: this.options.agent.name,
       memoryMethods: {
         setMemory: db.setMemory,
