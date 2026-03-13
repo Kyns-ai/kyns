@@ -11,8 +11,8 @@ const paths = require('~/config/paths');
 
 const PROXY_API_KEY = process.env.IMAGE_PROXY_KEY || 'kyns-image-internal';
 const POLL_INTERVAL_MS = 5000;
-const POLL_TIMEOUT_MS = 300_000;
-const NO_WORKER_CANCEL_MS = 240_000;
+const POLL_TIMEOUT_MS = 420_000;
+const NO_WORKER_CANCEL_MS = 300_000;
 const IMAGE_DAILY_LIMIT = 10;
 const IMAGE_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const RUNPOD_SUBMIT_TIMEOUT_MS = 30_000;
@@ -111,7 +111,7 @@ async function pollRunpodJob(endpointId, jobId, apiKey) {
   await axios
     .post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10_000 })
     .catch(() => {});
-  throw new Error('Timeout: geração de imagem demorou mais de 5 minutos.');
+  throw new Error('Timeout: geração de imagem demorou mais de 7 minutos.');
 }
 
 function parseImageRequest(messages, requestedModel) {

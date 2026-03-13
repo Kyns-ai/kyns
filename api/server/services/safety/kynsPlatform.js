@@ -17,7 +17,7 @@ const BLOCKED_REQUEST_RESPONSE = 'Essa conversa não pode continuar nessa direç
 const BLOCKED_RESPONSE_REPLACEMENT =
   'Não posso gerar esse tipo de conteúdo. Todos os personagens no KYNS são adultos.';
 const BLOCKED_USER_PLACEHOLDER = '[Mensagem bloqueada pela política da plataforma]';
-const INITIAL_VISIBLE_BUFFER_CHAR_LIMIT = 400;
+const INITIAL_VISIBLE_BUFFER_CHAR_LIMIT = 0;
 
 const MINOR_PATTERNS = [
   /\bmenores?\s+de\s+idade\b/i,
