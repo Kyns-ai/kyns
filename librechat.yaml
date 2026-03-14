@@ -204,6 +204,7 @@ endpoints:
     model: "llmfan46/Qwen3.5-27B-heretic-v2"
     provider: "openAI"
     disableBuilder: false
+    capabilities: ["deferred_tools", "execute_code", "file_search", "web_search", "actions", "context", "tools", "chain", "ocr"]
     addParams:
       chat_template_kwargs:
         enable_thinking: false
