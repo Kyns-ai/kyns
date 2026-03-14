@@ -46,11 +46,24 @@ rateLimits:
     userWindowInMinutes: 1440
 speech:
   tts:
-    openai:
-      url: '${TTS_BASE_URL}'
-      apiKey: '${TTS_API_KEY}'
-      model: 'tts-1'
-      voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
+    elevenlabs:
+      apiKey: '${ELEVENLABS_API_KEY}'
+      model: 'eleven_turbo_v2_5'
+      voices:
+        - cgSgspJ2msm6clMCkdW9
+        - FGY2WhTYpPnrIDTdsKH5
+        - EXAVITQu4vr4xnSDxMaL
+        - hpp4J3VqNfWAUOO0d1Us
+        - pFZP5JQG7iQjIQuC4Bku
+        - pNInz6obpgDQGcFmaJgB
+        - iP95p4xoKVk53GoZ742B
+        - IKne3meq5aSn9XLyUdCD
+        - JBFqnCBsd6RMkjVDRZzb
+        - nPczCjzI2devNBz1zQrb
+      voice_settings:
+        similarity_boost: 0.75
+        stability: 0.5
+        style: 0.3
   stt:
     openai:
       url: '${STT_BASE_URL}'
@@ -61,7 +74,7 @@ speech:
     speechToText:
       engineSTT: 'browser'
     textToSpeech:
-      engineTTS: 'browser'
+      engineTTS: 'external'
       automaticPlayback: true
       cacheTTS: true
 transactions:
