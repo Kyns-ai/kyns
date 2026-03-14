@@ -40,6 +40,8 @@ const domains = {
   client: process.env.DOMAIN_CLIENT,
   server: process.env.DOMAIN_SERVER,
 };
+const appBaseUrl = (domains.client || domains.server || '').replace(/\/$/, '');
+const logoUrl = appBaseUrl ? `${appBaseUrl}/assets/kyns-logo-mark.png` : '';
 
 const genericVerificationMessage = 'Confira seu e-mail para verificar sua conta.';
 const genericPasswordResetMessage =
@@ -49,6 +51,14 @@ const passwordResetRequestSubject = 'Redefina sua senha';
 const passwordResetSuccessSubject = 'Sua senha foi alterada';
 
 const getUserDisplayName = (user) => user.name || user.username || user.email;
+const getEmailPayload = (user, extraPayload = {}) => ({
+  appName: process.env.APP_TITLE || 'LibreChat',
+  appUrl: appBaseUrl,
+  logoUrl,
+  name: getUserDisplayName(user),
+  year: new Date().getFullYear(),
+  ...extraPayload,
+});
 
 const buildBalanceInsert = (balanceConfig, userId) => {
   if (!balanceConfig?.enabled || balanceConfig.startBalance == null) {
@@ -152,12 +162,7 @@ const sendVerificationEmail = async (user) => {
   await sendEmail({
     email: user.email,
     subject: verificationEmailSubject,
-    payload: {
-      appName: process.env.APP_TITLE || 'LibreChat',
-      name: getUserDisplayName(user),
-      verificationLink: verificationLink,
-      year: new Date().getFullYear(),
-    },
+    payload: getEmailPayload(user, { verificationLink }),
     template: 'verifyEmail.handlebars',
   });
 
@@ -335,7 +340,7 @@ const requestPasswordReset = async (req) => {
     error.message = 'Email domain not allowed';
     return error;
   }
-  const user = await findUser({ email }, 'email _id');
+  const user = await findUser({ email }, 'email _id name username');
   const emailEnabled = checkEmailConfig();
 
   logger.warn(`[requestPasswordReset] [Password reset request initiated] [Email: ${email}]`);
@@ -364,12 +369,7 @@ const requestPasswordReset = async (req) => {
     await sendEmail({
       email: user.email,
       subject: passwordResetRequestSubject,
-      payload: {
-        appName: process.env.APP_TITLE || 'LibreChat',
-        name: getUserDisplayName(user),
-        link: link,
-        year: new Date().getFullYear(),
-      },
+      payload: getEmailPayload(user, { link }),
       template: 'requestPasswordReset.handlebars',
     });
     logger.info(
@@ -420,11 +420,7 @@ const resetPassword = async (userId, token, password) => {
     await sendEmail({
       email: user.email,
       subject: passwordResetSuccessSubject,
-      payload: {
-        appName: process.env.APP_TITLE || 'LibreChat',
-        name: getUserDisplayName(user),
-        year: new Date().getFullYear(),
-      },
+      payload: getEmailPayload(user),
       template: 'passwordReset.handlebars',
     });
   }
@@ -625,12 +621,7 @@ const resendVerificationEmail = async (req) => {
     await sendEmail({
       email: user.email,
       subject: verificationEmailSubject,
-      payload: {
-        appName: process.env.APP_TITLE || 'LibreChat',
-        name: getUserDisplayName(user),
-        verificationLink: verificationLink,
-        year: new Date().getFullYear(),
-      },
+      payload: getEmailPayload(user, { verificationLink }),
       template: 'verifyEmail.handlebars',
     });
 
