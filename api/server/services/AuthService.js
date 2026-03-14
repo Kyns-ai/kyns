@@ -10,6 +10,7 @@ const { ErrorTypes, SystemRoles, errorsToString } = require('librechat-data-prov
 const {
   math,
   isEnabled,
+  getBalanceConfig,
   checkEmailConfig,
   isEmailDomainAllowed,
   shouldUseSecureCookie,
@@ -30,6 +31,7 @@ const {
   deleteUserById,
   generateRefreshToken,
 } = require('~/models');
+const { Balance } = require('~/db/models');
 const { registerSchema } = require('~/strategies/validators');
 const { getAppConfig } = require('~/server/services/Config');
 const { sendEmail } = require('~/server/utils');
@@ -39,7 +41,59 @@ const domains = {
   server: process.env.DOMAIN_SERVER,
 };
 
-const genericVerificationMessage = 'Please check your email to verify your email address.';
+const genericVerificationMessage = 'Confira seu e-mail para verificar sua conta.';
+const genericPasswordResetMessage =
+  'Se existir uma conta com esse e-mail, enviaremos um link para redefinir sua senha.';
+const verificationEmailSubject = 'Verifique seu e-mail';
+const passwordResetRequestSubject = 'Redefina sua senha';
+const passwordResetSuccessSubject = 'Sua senha foi alterada';
+
+const getUserDisplayName = (user) => user.name || user.username || user.email;
+
+const buildBalanceInsert = (balanceConfig, userId) => {
+  if (!balanceConfig?.enabled || balanceConfig.startBalance == null) {
+    return null;
+  }
+
+  const balanceInsert = {
+    user: userId,
+    tokenCredits: balanceConfig.startBalance,
+  };
+
+  const hasAutoRefillConfig =
+    balanceConfig.autoRefillEnabled &&
+    balanceConfig.refillIntervalValue != null &&
+    balanceConfig.refillIntervalUnit != null &&
+    balanceConfig.refillAmount != null;
+
+  if (!hasAutoRefillConfig) {
+    return balanceInsert;
+  }
+
+  return {
+    ...balanceInsert,
+    autoRefillEnabled: true,
+    refillIntervalValue: balanceConfig.refillIntervalValue,
+    refillIntervalUnit: balanceConfig.refillIntervalUnit,
+    refillAmount: balanceConfig.refillAmount,
+    lastRefill: new Date(),
+  };
+};
+
+const provisionVerifiedUserBalance = async (appConfig, userId) => {
+  const balanceConfig = getBalanceConfig(appConfig);
+  const balanceInsert = buildBalanceInsert(balanceConfig, userId);
+
+  if (!balanceInsert) {
+    return;
+  }
+
+  await Balance.findOneAndUpdate(
+    { user: userId },
+    { $setOnInsert: balanceInsert },
+    { upsert: true, new: true },
+  );
+};
 
 /**
  * Logout user
@@ -97,10 +151,10 @@ const sendVerificationEmail = async (user) => {
   }/verify?token=${verifyToken}&email=${encodeURIComponent(user.email)}`;
   await sendEmail({
     email: user.email,
-    subject: 'Verify your email',
+    subject: verificationEmailSubject,
     payload: {
       appName: process.env.APP_TITLE || 'LibreChat',
-      name: user.name || user.username || user.email,
+      name: getUserDisplayName(user),
       verificationLink: verificationLink,
       year: new Date().getFullYear(),
     },
@@ -125,6 +179,7 @@ const sendVerificationEmail = async (user) => {
 const verifyEmail = async (req) => {
   const { email, token } = req.body;
   const decodedEmail = decodeURIComponent(email);
+  const appConfig = await getAppConfig();
 
   const user = await findUser({ email: decodedEmail }, 'email _id emailVerified');
 
@@ -142,7 +197,7 @@ const verifyEmail = async (req) => {
 
   if (!emailVerificationData) {
     logger.warn(`[verifyEmail] [No email verification data found] [Email: ${decodedEmail}]`);
-    return new Error('Invalid or expired password reset token');
+    return new Error('Invalid or expired email verification token');
   }
 
   const isValid = bcrypt.compareSync(token, emailVerificationData.token);
@@ -159,6 +214,15 @@ const verifyEmail = async (req) => {
   if (!updatedUser) {
     logger.warn(`[verifyEmail] [User update failed] [Email: ${decodedEmail}]`);
     return new Error('Failed to update user verification status');
+  }
+
+  try {
+    await provisionVerifiedUserBalance(appConfig, emailVerificationData.userId);
+  } catch (error) {
+    logger.error(
+      `[verifyEmail] [Balance provisioning failed] [Email: ${decodedEmail}]`,
+      error,
+    );
   }
 
   await deleteTokens({ token: emailVerificationData.token });
@@ -228,10 +292,14 @@ const registerUser = async (user, additionalData = {}) => {
 
     const emailEnabled = checkEmailConfig();
     const disableTTL = isEnabled(process.env.ALLOW_UNVERIFIED_EMAIL_LOGIN);
+    const shouldSendVerificationEmail = emailEnabled && !newUserData.emailVerified;
+    const initialBalanceConfig = shouldSendVerificationEmail
+      ? undefined
+      : getBalanceConfig(appConfig);
 
-    const newUser = await createUser(newUserData, appConfig.balance, disableTTL, true);
+    const newUser = await createUser(newUserData, initialBalanceConfig, disableTTL, true);
     newUserId = newUser._id;
-    if (emailEnabled && !newUser.emailVerified) {
+    if (shouldSendVerificationEmail) {
       await sendVerificationEmail({
         _id: newUserId,
         email,
@@ -275,7 +343,7 @@ const requestPasswordReset = async (req) => {
   if (!user) {
     logger.warn(`[requestPasswordReset] [No user found] [Email: ${email}] [IP: ${req.ip}]`);
     return {
-      message: 'If an account with that email exists, a password reset link has been sent to it.',
+      message: genericPasswordResetMessage,
     };
   }
 
@@ -295,10 +363,10 @@ const requestPasswordReset = async (req) => {
   if (emailEnabled) {
     await sendEmail({
       email: user.email,
-      subject: 'Password Reset Request',
+      subject: passwordResetRequestSubject,
       payload: {
         appName: process.env.APP_TITLE || 'LibreChat',
-        name: user.name || user.username || user.email,
+        name: getUserDisplayName(user),
         link: link,
         year: new Date().getFullYear(),
       },
@@ -315,7 +383,7 @@ const requestPasswordReset = async (req) => {
   }
 
   return {
-    message: 'If an account with that email exists, a password reset link has been sent to it.',
+    message: genericPasswordResetMessage,
   };
 };
 
@@ -351,10 +419,10 @@ const resetPassword = async (userId, token, password) => {
   if (checkEmailConfig()) {
     await sendEmail({
       email: user.email,
-      subject: 'Password Reset Successfully',
+      subject: passwordResetSuccessSubject,
       payload: {
         appName: process.env.APP_TITLE || 'LibreChat',
-        name: user.name || user.username || user.email,
+        name: getUserDisplayName(user),
         year: new Date().getFullYear(),
       },
       template: 'passwordReset.handlebars',
@@ -556,10 +624,10 @@ const resendVerificationEmail = async (req) => {
 
     await sendEmail({
       email: user.email,
-      subject: 'Verify your email',
+      subject: verificationEmailSubject,
       payload: {
         appName: process.env.APP_TITLE || 'LibreChat',
-        name: user.name || user.username || user.email,
+        name: getUserDisplayName(user),
         verificationLink: verificationLink,
         year: new Date().getFullYear(),
       },

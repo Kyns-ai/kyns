@@ -153,7 +153,7 @@
                                   style='margin: 0px; line-height: 140%; text-align: left; word-wrap: break-word; font-size: 22px; font-weight: 700;'
                                 >
                                   <div>
-                                    <div>Welcome to {{appName}}!</div>
+                                    <div>Verifique seu e-mail</div>
                                   </div>
                                 </h1>
                                 <!--[if mso]></td></tr></table><![endif]-->
@@ -179,7 +179,7 @@
                                   style='font-size: 14px; line-height: 140%; text-align: left; word-wrap: break-word;'
                                 >
                                   <div>
-                                    <div>Dear {{name}},</div>
+                                    <div>Olá{{#if name}} {{name}}{{/if}},</div>
                                   </div>
                                 </div>
                               </td>
@@ -204,9 +204,7 @@
                                   style='font-size: 14px; line-height: 140%; text-align: left; word-wrap: break-word;'
                                 >
                                   <div>
-                                    <div>Thank you for registering with
-                                      {{appName}}. To complete your registration and verify your
-                                      email address, please click the button below:</div>
+                                    <div>Confirme seu e-mail para ativar sua conta na {{appName}}.</div>
                                   </div>
                                 </div>
                               </td>
@@ -238,7 +236,7 @@
                                   >
                                     <span style='display:block;padding:10px 20px;line-height:120%;'>
                                       <div>
-                                        <div>Verify Email</div>
+                                        <div>Verificar e-mail</div>
                                       </div>
                                     </span>
                                   </a>
@@ -266,8 +264,12 @@
                                   style='font-size: 14px; line-height: 140%; text-align: left; word-wrap: break-word;'
                                 >
                                   <div>
-                                    <div>If you did not create an account with
-                                      {{appName}}, please ignore this email.</div>
+                                    <div>Se o botão não abrir, use este link:</div>
+                                    <div style='margin-top: 8px; word-break: break-all;'>
+                                      <a href='{{verificationLink}}' target='_blank'>{{verificationLink}}</a>
+                                    </div>
+                                    <div style='margin-top: 8px;'>Link válido por 15 minutos.</div>
+                                    <div style='margin-top: 8px;'>Se não foi você, ignore este e-mail.</div>
                                   </div>
                                 </div>
                               </td>
@@ -291,8 +293,7 @@
                                 <div
                                   style='font-size: 14px; line-height: 140%; text-align: left; word-wrap: break-word;'
                                 >
-                                  <div>Best regards,</div>
-                                  <div>The {{appName}} Team</div>
+                                  <div>Equipe {{appName}}</div>
                                 </div>
                               </td>
                             </tr>
@@ -316,9 +317,7 @@
                                   style='font-size: 14px; line-height: 140%; text-align: right; word-wrap: break-word;'
                                 >
                                   <div>
-                                    <div><sub>©
-                                        {{year}}
-                                        {{appName}}. All rights reserved.</sub></div>
+                                    <div><sub>© {{year}} {{appName}}</sub></div>
                                   </div>
                                 </div>
                               </td>
