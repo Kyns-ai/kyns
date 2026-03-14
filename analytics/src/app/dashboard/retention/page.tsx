@@ -22,6 +22,7 @@ export default function RetentionPage() {
   const rates = data?.rates ?? {}
   const cohort = data?.cohort ?? []
   const engagement = data?.engagement ?? {}
+  const streaks = data?.streaks ?? {}
 
   const currentDAU = dau[dau.length - 1]?.dau ?? 0
   const currentMAU = mau[mau.length - 1]?.mau ?? 0
@@ -50,6 +51,13 @@ export default function RetentionPage() {
           <StatCard label="Users no limite" value={engagement.usersAtDailyLimit ?? '—'} sub={`${engagement.usersAtDailyLimitPct ?? 0}% do total`} />
           <StatCard label="DAU atual" value={currentDAU.toLocaleString('pt-BR')} />
           <StatCard label="MAU atual" value={currentMAU.toLocaleString('pt-BR')} />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Streak 3+ dias" value={streaks.streak3plus ?? '—'} sub="usuários ativos" accent />
+          <StatCard label="Streak 7+ dias" value={streaks.streak7plus ?? '—'} sub="usuários ativos" />
+          <StatCard label="Maior streak atual" value={`${streaks.longestCurrent ?? '—'} dias`} />
+          <StatCard label="Streak médio" value={`${streaks.avgStreakLength ?? '—'} dias`} sub="todos os usuários" />
         </div>
 
         {/* DAU chart */}

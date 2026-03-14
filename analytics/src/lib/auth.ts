@@ -6,7 +6,13 @@ const COOKIE_NAME = 'kyns_analytics_token'
 const TOKEN_EXPIRY = '24h'
 
 function getSecret(): Uint8Array {
-  const secret = process.env.SESSION_SECRET ?? 'kyns-analytics-dev-secret-change-in-prod'
+  const secret = process.env.SESSION_SECRET
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('SESSION_SECRET environment variable is required in production')
+    }
+    return new TextEncoder().encode('kyns-analytics-dev-secret-change-in-prod')
+  }
   return new TextEncoder().encode(secret)
 }
 

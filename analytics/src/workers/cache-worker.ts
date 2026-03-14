@@ -7,6 +7,7 @@ import { getActivationFunnel, getTimeToFirstMessage, getActivationRate } from '.
 import { getConversationStats, getTopFirstMessageWords, getMessageLengthDistribution } from '../lib/queries/behavior'
 import { getWeeklyChurn } from '../lib/queries/growth'
 import { getDailyErrorRate } from '../lib/queries/quality'
+import { getInfrastructureStatus, logUptimeCheck } from '../lib/queries/admin-infrastructure'
 
 async function safeRun<T>(label: string, fn: () => Promise<T>): Promise<void> {
   try {
@@ -27,6 +28,13 @@ async function runAllAggregations() {
     console.error('[CacheWorker] MongoDB connection failed:', (e as Error).message)
     return
   }
+
+  await safeRun('Uptime', async () => {
+    const infra = await getInfrastructureStatus()
+    for (const ep of infra.endpoints) {
+      await logUptimeCheck(ep.name, ep.status === 'online', ep.latencyMs)
+    }
+  })
 
   await Promise.all([
     safeRun('DAU', () => getDAU(30)),

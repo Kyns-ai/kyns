@@ -28,6 +28,8 @@ export async function getRealtimeMetrics(): Promise<RealtimeMetrics> {
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const todayStart = startOfDay(now)
 
+  const toolcalls = await getCollection('toolcalls')
+
   const [
     onlineUsers,
     totalUsers,
@@ -38,6 +40,7 @@ export async function getRealtimeMetrics(): Promise<RealtimeMetrics> {
     conversationsToday,
     errorsToday,
     imagesGeneratedToday,
+    webSearchesToday,
   ] = await Promise.all([
     messages.distinct('user', { createdAt: { $gte: fiveMinAgo }, isCreatedByUser: true }),
     users.countDocuments({ expiresAt: { $exists: false } }),
@@ -52,6 +55,10 @@ export async function getRealtimeMetrics(): Promise<RealtimeMetrics> {
       endpoint: 'agents',
       agent_id: 'kyns-image-agent',
     }),
+    toolcalls.countDocuments({
+      createdAt: { $gte: todayStart },
+      toolId: { $regex: /web_search/i },
+    }),
   ])
 
   return {
@@ -64,6 +71,6 @@ export async function getRealtimeMetrics(): Promise<RealtimeMetrics> {
     conversationsToday,
     errorsToday,
     imagesGeneratedToday,
-    webSearchesToday: 0,
+    webSearchesToday,
   }
 }

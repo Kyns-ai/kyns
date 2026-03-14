@@ -248,6 +248,81 @@ export async function getCohortAnalysis(): Promise<CohortRow[]> {
   return rows
 }
 
+export interface StreakStats {
+  streak3plus: number
+  streak7plus: number
+  longestCurrent: number
+  avgStreakLength: number
+}
+
+export async function getStreakStats(): Promise<StreakStats> {
+  const cacheKey = 'streak_stats'
+  const cached = await getCached<StreakStats>(cacheKey)
+  if (cached) return cached
+
+  const messages = await getCollection('messages')
+  const since = new Date(Date.now() - 90 * 86400000)
+
+  const userDays = await messages
+    .aggregate<{ _id: string; dates: string[] }>([
+      { $match: { createdAt: { $gte: since }, isCreatedByUser: true } },
+      {
+        $group: {
+          _id: {
+            user: '$user',
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          },
+        },
+      },
+      { $group: { _id: '$_id.user', dates: { $addToSet: '$_id.date' } } },
+    ])
+    .toArray()
+
+  const todayStr = new Date().toISOString().substring(0, 10)
+  let streak3 = 0
+  let streak7 = 0
+  let longestCurrent = 0
+  const allStreaks: number[] = []
+
+  for (const user of userDays) {
+    const sorted = user.dates.sort()
+    let currentStreak = 1
+    let maxStreak = 1
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = new Date(sorted[i - 1])
+      const curr = new Date(sorted[i])
+      const diffDays = Math.round((curr.getTime() - prev.getTime()) / 86400000)
+      if (diffDays === 1) {
+        currentStreak++
+        maxStreak = Math.max(maxStreak, currentStreak)
+      } else {
+        currentStreak = 1
+      }
+    }
+
+    const lastDate = sorted[sorted.length - 1]
+    const daysSinceLast = Math.round((new Date(todayStr).getTime() - new Date(lastDate).getTime()) / 86400000)
+    const isCurrentStreak = daysSinceLast <= 1
+
+    if (isCurrentStreak) {
+      longestCurrent = Math.max(longestCurrent, currentStreak)
+      if (currentStreak >= 3) streak3++
+      if (currentStreak >= 7) streak7++
+    }
+
+    allStreaks.push(maxStreak)
+  }
+
+  const avgStreakLength = allStreaks.length > 0
+    ? Math.round((allStreaks.reduce((s, v) => s + v, 0) / allStreaks.length) * 10) / 10
+    : 0
+
+  const data: StreakStats = { streak3plus: streak3, streak7plus: streak7, longestCurrent, avgStreakLength }
+  await setCache(cacheKey, data)
+  return data
+}
+
 export interface EngagementStats {
   avgSessionsPerUserPerDay: number
   avgMessagesPerUserPerDay: number

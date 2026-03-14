@@ -17,12 +17,13 @@ export default function CharactersPage() {
 
   const stats = data?.stats ?? []
   const retention = data?.retention ?? []
+  const deepEngagement = data?.deepEngagement ?? { platformDeepPct: 0, characters: [] }
 
   return (
     <>
       <Header title="Characters" />
       <div className="p-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard label="Total de Characters" value={stats.length} />
           <StatCard
             label="Mais popular"
@@ -33,6 +34,12 @@ export default function CharactersPage() {
             label="Mais engajante"
             value={stats.sort((a: { avgConversationTurns: number }, b: { avgConversationTurns: number }) => b.avgConversationTurns - a.avgConversationTurns)[0]?.name ?? '—'}
             sub="maior média de turnos"
+          />
+          <StatCard
+            label="Conversas profundas"
+            value={`${deepEngagement.platformDeepPct}%`}
+            sub=">20 msgs do usuário"
+            accent
           />
         </div>
 
@@ -93,6 +100,30 @@ export default function CharactersPage() {
             )}
           </SectionCard>
         </div>
+
+        {/* Deep engagement per character */}
+        <SectionCard
+          title="Conversas profundas por Character"
+          subtitle="% de conversas com >20 mensagens do usuário"
+        >
+          {!data ? <LoadingChart height={250} /> : (
+            deepEngagement.characters.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-8">Dados insuficientes</p>
+            ) : (
+              <KBarChart
+                data={deepEngagement.characters.slice(0, 10).map((c: { name: string; deepPct: number }) => ({
+                  name: c.name.length > 25 ? c.name.substring(0, 25) + '…' : c.name,
+                  '% Profundas': c.deepPct,
+                }))}
+                xKey="name"
+                barKey="% Profundas"
+                horizontal
+                height={250}
+                color="#f59e0b"
+              />
+            )
+          )}
+        </SectionCard>
 
         {/* Character retention correlation */}
         <SectionCard

@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb'
-import { getCollection } from '../mongodb'
+import { getCollection, getCached, setCache } from '../mongodb'
+import { startOfDay, subDays } from 'date-fns'
 
 export interface ErrorLog {
   _id: string
@@ -197,4 +198,57 @@ export async function flagConversation(conversationId: string, reason: string, u
     },
     { upsert: true }
   )
+}
+
+const BLOCKED_RESPONSE_TEXT = 'Essa conversa não pode continuar nessa direção.'
+
+export interface CsamBlockStats {
+  blocksToday: number
+  blocks7d: number
+  blockRatePct: number
+  dailyCounts: Array<{ date: string; count: number }>
+}
+
+export async function getCsamBlockStats(days = 7): Promise<CsamBlockStats> {
+  const cacheKey = `csam_blocks_${days}`
+  const cached = await getCached<CsamBlockStats>(cacheKey)
+  if (cached) return cached
+
+  const messages = await getCollection('messages')
+  const now = new Date()
+  const todayStart = startOfDay(now)
+  const since = subDays(todayStart, days)
+
+  const [blockedMessages, totalMessagesToday, totalMessages7d] = await Promise.all([
+    messages
+      .aggregate<{ _id: string; count: number }>([
+        {
+          $match: {
+            createdAt: { $gte: since },
+            isCreatedByUser: false,
+            text: BLOCKED_RESPONSE_TEXT,
+          },
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray(),
+    messages.countDocuments({ createdAt: { $gte: todayStart }, isCreatedByUser: true }),
+    messages.countDocuments({ createdAt: { $gte: since }, isCreatedByUser: true }),
+  ])
+
+  const dailyCounts = blockedMessages.map((d) => ({ date: d._id, count: d.count }))
+  const todayStr = todayStart.toISOString().substring(0, 10)
+  const blocksToday = dailyCounts.find((d) => d.date === todayStr)?.count ?? 0
+  const blocks7d = dailyCounts.reduce((s, d) => s + d.count, 0)
+  const blockRatePct = totalMessages7d > 0 ? Math.round((blocks7d / totalMessages7d) * 10000) / 100 : 0
+
+  const data: CsamBlockStats = { blocksToday, blocks7d, blockRatePct, dailyCounts }
+  await setCache(cacheKey, data)
+  return data
 }

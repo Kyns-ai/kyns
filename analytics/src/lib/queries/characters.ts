@@ -149,6 +149,87 @@ export async function getCharacterStats(days = 30): Promise<CharacterStats[]> {
   return result
 }
 
+export interface DeepEngagementStats {
+  platformDeepPct: number
+  characters: Array<{ agentId: string; name: string; deepPct: number; deepCount: number; totalConvos: number }>
+}
+
+export async function getDeepEngagementStats(days = 30): Promise<DeepEngagementStats> {
+  const cacheKey = `deep_engagement_${days}`
+  const cached = await getCached<DeepEngagementStats>(cacheKey)
+  if (cached) return cached
+
+  const messages = await getCollection('messages')
+  const agentsCol = await getCollection('agents')
+  const since = new Date(Date.now() - days * 86400000)
+
+  const convoTurns = await messages
+    .aggregate<{ _id: { conversationId: string; agentId: string }; turns: number }>([
+      {
+        $match: {
+          createdAt: { $gte: since },
+          isCreatedByUser: true,
+          endpoint: 'agents',
+        },
+      },
+      {
+        $lookup: {
+          from: 'conversations',
+          localField: 'conversationId',
+          foreignField: 'conversationId',
+          as: 'convo',
+        },
+      },
+      { $unwind: { path: '$convo', preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: { conversationId: '$conversationId', agentId: '$convo.agent_id' },
+          turns: { $sum: 1 },
+        },
+      },
+    ])
+    .toArray()
+
+  const byAgent: Record<string, { deep: number; total: number }> = {}
+  let platformDeep = 0
+  let platformTotal = 0
+
+  for (const c of convoTurns) {
+    const aid = c._id.agentId
+    if (!aid || aid === 'kyns-image-agent') continue
+    if (!byAgent[aid]) byAgent[aid] = { deep: 0, total: 0 }
+    byAgent[aid].total++
+    platformTotal++
+    if (c.turns > 20) {
+      byAgent[aid].deep++
+      platformDeep++
+    }
+  }
+
+  const agentIds = Object.keys(byAgent)
+  const agents = await agentsCol.find({ id: { $in: agentIds } }).toArray()
+  const nameMap = Object.fromEntries(
+    agents.map((a) => [(a as unknown as { id: string; name: string }).id, (a as unknown as { id: string; name: string }).name])
+  )
+
+  const characters = Object.entries(byAgent)
+    .map(([agentId, { deep, total }]) => ({
+      agentId,
+      name: nameMap[agentId] ?? agentId,
+      deepPct: total > 0 ? Math.round((deep / total) * 100) : 0,
+      deepCount: deep,
+      totalConvos: total,
+    }))
+    .sort((a, b) => b.deepPct - a.deepPct)
+
+  const data: DeepEngagementStats = {
+    platformDeepPct: platformTotal > 0 ? Math.round((platformDeep / platformTotal) * 100) : 0,
+    characters,
+  }
+  await setCache(cacheKey, data)
+  return data
+}
+
 export async function getCharacterRetention(days = 30): Promise<
   Array<{ agentId: string; name: string; d7RetentionProxy: number }>
 > {

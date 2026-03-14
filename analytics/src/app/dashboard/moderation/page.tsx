@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import Header from '@/components/layout/Header'
+import StatCard from '@/components/ui/StatCard'
 import SectionCard from '@/components/ui/SectionCard'
 import { statusBadge } from '@/components/ui/Badge'
 import Pagination from '@/components/ui/Pagination'
-import type { ModerationItem } from '@/lib/queries/admin-logs'
+import type { ModerationItem, CsamBlockStats } from '@/lib/queries/admin-logs'
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -15,7 +16,7 @@ export default function ModerationPage() {
   const [page, setPage] = useState(1)
   const [toast, setToast] = useState('')
 
-  const { data, mutate } = useSWR<{ items: ModerationItem[]; total: number }>(
+  const { data, mutate } = useSWR<{ items: ModerationItem[]; total: number; csamStats?: CsamBlockStats }>(
     `/api/admin/moderation?status=${status}&page=${page}&limit=50`,
     fetcher,
     { refreshInterval: 60_000 }
@@ -47,6 +48,12 @@ export default function ModerationPage() {
       )}
 
       <div className="p-6 space-y-6">
+        <div className="grid grid-cols-3 gap-4">
+          <StatCard label="Bloqueios hoje" value={data?.csamStats?.blocksToday ?? '—'} accent />
+          <StatCard label="Bloqueios 7d" value={data?.csamStats?.blocks7d ?? '—'} />
+          <StatCard label="Taxa de bloqueio" value={`${data?.csamStats?.blockRatePct ?? '—'}%`} sub="% do total de msgs" />
+        </div>
+
         <div className="flex gap-2">
           {['pending', 'reviewed', 'ignored', 'all'].map((s) => (
             <button
