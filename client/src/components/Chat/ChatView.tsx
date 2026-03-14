@@ -132,6 +132,8 @@ function ChatView({ index = 0 }: { index?: number }) {
   const isLandingPage =
     !hasEffectiveMessages && (conversationId === Constants.NEW_CONVO || !conversationId);
   const isNavigating = !hasEffectiveMessages && conversationId != null;
+  const isAgentChat =
+    conversation?.agent_id != null && isAgentsEndpoint(conversation.endpoint ?? '');
 
   if (isLoading && conversationId !== Constants.NEW_CONVO) {
     content = <LoadingSpinner />;
@@ -149,7 +151,7 @@ function ChatView({ index = 0 }: { index?: number }) {
         <AddedChatContext.Provider value={addedChatHelpers}>
           <Presentation>
             <div className="relative flex h-full w-full flex-col">
-              {!isLoading && <Header />}
+              {!isLoading && !isAgentChat && <Header />}
               <>
                 <div
                   className={cn(

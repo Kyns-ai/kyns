@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { useRecoilValue } from 'recoil';
 import { CSSTransition } from 'react-transition-group';
+import { isAgentsEndpoint } from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import { useScreenshot, useMessageScrolling, useLocalize } from '~/hooks';
 import ScrollToBottom from '~/components/Messages/ScrollToBottom';
@@ -34,6 +35,8 @@ function MessagesViewContent({
   } = useMessageScrolling(_messagesTree);
 
   const { conversationId } = conversation ?? {};
+  const isAgentChat =
+    conversation?.agent_id != null && isAgentsEndpoint(conversation?.endpoint ?? '');
 
   return (
     <>
@@ -49,7 +52,7 @@ function MessagesViewContent({
               width: '100%',
             }}
           >
-            <div className="flex flex-col pb-9 pt-14 dark:bg-transparent">
+            <div className={cn('flex flex-col pb-9 dark:bg-transparent', isAgentChat ? 'pt-0' : 'pt-14')}>
               <AgentChatHeader conversation={conversation} />
               {(_messagesTree && _messagesTree.length == 0) || _messagesTree === null ? (
                 <div
