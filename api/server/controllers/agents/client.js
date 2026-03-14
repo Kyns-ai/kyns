@@ -63,7 +63,7 @@ const { prependKynsMasterPrompt, KynsResponseFilteredError } = require('~/server
 const db = require('~/models');
 
 const DEFAULT_AGENT_RECURSION_LIMIT = 16;
-const MEMORY_CONTEXT_TIMEOUT_MS = 1500;
+const MEMORY_CONTEXT_TIMEOUT_MS = 8000;
 const SLOW_STAGE_THRESHOLD_MS = 200;
 const MANUAL_WEB_SEARCH_TOOL_ID = 'manual-web-search';
 
@@ -504,7 +504,7 @@ class AgentClient extends BaseClient {
    * @param {number} timeoutMs - Timeout in milliseconds (default: 3000)
    * @returns {Promise<(TAttachment | null)[] | undefined>}
    */
-  async awaitMemoryWithTimeout(memoryPromise, timeoutMs = 3000) {
+  async awaitMemoryWithTimeout(memoryPromise, timeoutMs = 45000) {
     if (!memoryPromise) {
       return;
     }
@@ -518,7 +518,7 @@ class AgentClient extends BaseClient {
       return attachments;
     } catch (error) {
       if (error.message === 'Memory processing timeout') {
-        logger.warn('[AgentClient] Memory processing timed out after 3 seconds');
+        logger.warn(`[AgentClient] Memory processing timed out after ${timeoutMs}ms`);
       } else {
         logger.error('[AgentClient] Error processing memory:', error);
       }
