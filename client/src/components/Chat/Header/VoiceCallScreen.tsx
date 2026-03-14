@@ -1,7 +1,7 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useRecoilState, useRecoilValue } from 'recoil';
-import { PhoneOff, Mic, MicOff } from 'lucide-react';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { PhoneOff, Mic } from 'lucide-react';
 import { useChatContext } from '~/Providers';
 import useSpeechToText from '~/hooks/Input/useSpeechToText';
 import useSoundEffects from '~/hooks/Audio/useSoundEffects';
@@ -15,7 +15,7 @@ interface VoiceCallScreenProps {
 
 type CallState = 'connecting' | 'idle' | 'listening' | 'processing' | 'speaking';
 
-const WAVEFORM_BARS = 40;
+const BARS = 40;
 
 const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({ agentName, agentAvatar, onEnd }) => {
   const { ask } = useChatContext();
@@ -23,174 +23,132 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({ agentName, agentAvata
 
   const [callState, setCallState] = useState<CallState>('connecting');
   const [duration, setDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
   const [subtitle, setSubtitle] = useState('');
-  const [waveHeights, setWaveHeights] = useState<number[]>(() => Array(WAVEFORM_BARS).fill(3));
+  const [heights, setHeights] = useState<number[]>(() => Array(BARS).fill(3));
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const waveRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mountedRef = useRef(true);
+  const alive = useRef(true);
+  const wasSubmitting = useRef(false);
 
   const isSubmitting = useRecoilValue(store.isSubmitting);
-  const [, setAutoTranscribe] = useRecoilState(store.autoTranscribeAudio);
-  const [, setAutoSend] = useRecoilState(store.autoSendText);
-  const [, setAutoPlayback] = useRecoilState(store.automaticPlayback);
-
-  const prevSettingsRef = useRef({
-    t: false,
-    s: -1,
-    p: false,
-  });
+  const setAutoTranscribe = useSetRecoilState(store.autoTranscribeAudio);
+  const setAutoSend = useSetRecoilState(store.autoSendText);
+  const setAutoPlayback = useSetRecoilState(store.automaticPlayback);
 
   const onTranscriptionComplete = useCallback(
     (text: string) => {
-      if (!mountedRef.current || !text.trim()) return;
-      setSubtitle(text.length > 60 ? text.substring(0, 60) + '...' : text);
+      if (!alive.current || !text.trim()) return;
+      setSubtitle(text.length > 60 ? `${text.substring(0, 60)}...` : text);
       setCallState('processing');
       ask({ text });
     },
     [ask],
   );
 
-  const setText = useCallback((_text: string) => {
-    // no-op: we don't need to update a text input in call mode
-  }, []);
+  const noop = useCallback(() => {}, []);
 
   const { isListening, isLoading, startRecording, stopRecording } = useSpeechToText(
-    setText,
+    noop,
     onTranscriptionComplete,
   );
 
-  // Save prev settings on mount, restore on unmount
+  // Mount: enable conversation mode, start timer, play ring
   useEffect(() => {
-    prevSettingsRef.current = {
-      t: false, // default values (we read fresh on unmount)
-      s: -1,
-      p: false,
-    };
     setAutoTranscribe(true);
     setAutoSend(0);
     setAutoPlayback(true);
-
     timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
-
-    const ringTimer = setTimeout(() => {
-      if (mountedRef.current) {
+    const t = setTimeout(() => {
+      if (alive.current) {
         playRing();
         setCallState('idle');
       }
     }, 800);
-
     return () => {
-      mountedRef.current = false;
+      alive.current = false;
       if (timerRef.current) clearInterval(timerRef.current);
       if (waveRef.current) clearInterval(waveRef.current);
-      clearTimeout(ringTimer);
-      setAutoTranscribe(prevSettingsRef.current.t);
-      setAutoSend(prevSettingsRef.current.s);
-      setAutoPlayback(prevSettingsRef.current.p);
+      clearTimeout(t);
+      setAutoTranscribe(false);
+      setAutoSend(-1);
+      setAutoPlayback(false);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync callState with actual recording state
+  // Sync callState ← recording state
   useEffect(() => {
-    if (isListening) {
-      setCallState('listening');
-    } else if (isLoading) {
-      setCallState('processing');
-    }
+    if (isListening) setCallState('listening');
+    else if (isLoading) setCallState('processing');
   }, [isListening, isLoading]);
 
-  // Detect when AI finishes responding (isSubmitting goes false after being true)
-  const wasSubmitting = useRef(false);
+  // Sync callState ← AI responding
   useEffect(() => {
     if (isSubmitting) {
       wasSubmitting.current = true;
       setCallState('speaking');
     } else if (wasSubmitting.current) {
       wasSubmitting.current = false;
-      if (mountedRef.current) {
-        setCallState('idle');
-      }
+      if (alive.current) setCallState('idle');
     }
   }, [isSubmitting]);
 
   // Waveform animation
   useEffect(() => {
+    if (waveRef.current) clearInterval(waveRef.current);
     if (callState === 'listening' || callState === 'speaking') {
       waveRef.current = setInterval(() => {
-        setWaveHeights(
-          Array.from({ length: WAVEFORM_BARS }, () =>
-            callState === 'listening' ? 3 + Math.random() * 14 : 4 + Math.random() * 24,
-          ),
-        );
+        setHeights(Array.from({ length: BARS }, () =>
+          callState === 'listening' ? 3 + Math.random() * 16 : 4 + Math.random() * 26,
+        ));
       }, 120);
     } else if (callState === 'processing') {
       waveRef.current = setInterval(() => {
-        setWaveHeights((prev) =>
-          prev.map((h, i) => 3 + Math.sin(Date.now() / 300 + i * 0.5) * 6),
-        );
+        setHeights((prev) => prev.map((_h, i) => 3 + Math.sin(Date.now() / 300 + i * 0.5) * 6));
       }, 80);
     } else {
-      if (waveRef.current) clearInterval(waveRef.current);
-      setWaveHeights(Array(WAVEFORM_BARS).fill(3));
+      setHeights(Array(BARS).fill(3));
     }
-    return () => {
-      if (waveRef.current) clearInterval(waveRef.current);
-    };
+    return () => { if (waveRef.current) clearInterval(waveRef.current); };
   }, [callState]);
 
-  const handleMicToggle = useCallback(() => {
-    if (isMuted) {
-      setIsMuted(false);
-      playClick();
-      return;
-    }
+  const handleMic = useCallback(() => {
+    playClick();
     if (isListening) {
       stopRecording();
-      playClick();
     } else {
       startRecording();
-      playClick();
     }
-  }, [isListening, isMuted, startRecording, stopRecording, playClick]);
-
-  const handleMuteToggle = useCallback(() => {
-    playClick();
-    setIsMuted((m) => !m);
-    if (!isMuted && isListening) {
-      stopRecording();
-    }
-  }, [playClick, isMuted, isListening, stopRecording]);
+  }, [isListening, startRecording, stopRecording, playClick]);
 
   const handleEnd = useCallback(() => {
     playHangup();
     if (isListening) stopRecording();
-    setTimeout(() => onEnd(), 400);
+    setTimeout(onEnd, 400);
   }, [playHangup, isListening, stopRecording, onEnd]);
 
-  const fmt = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-  };
+  const fmt = (s: number) =>
+    `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
-  const stateLabel: Record<CallState, string> = {
+  const label: Record<CallState, string> = {
     connecting: 'Conectando...',
-    idle: 'Toque o microfone para falar',
+    idle: 'Toque para falar',
     listening: 'Ouvindo...',
     processing: 'Pensando...',
     speaking: `${agentName} falando...`,
   };
 
-  const waveColor: Record<CallState, string> = {
+  const barColor: Record<CallState, string> = {
     connecting: 'bg-gray-600',
     idle: 'bg-gray-600',
-    listening: 'bg-emerald-500',
-    processing: 'bg-amber-500/60',
-    speaking: 'bg-violet-500',
+    listening: 'bg-emerald-400',
+    processing: 'bg-amber-400/60',
+    speaking: 'bg-violet-400',
   };
 
-  const screen = (
+  const micBusy = callState === 'connecting' || callState === 'processing' || callState === 'speaking';
+
+  return createPortal(
     <div
       className="fixed inset-0 flex flex-col"
       style={{
@@ -198,60 +156,48 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({ agentName, agentAvata
         background: 'linear-gradient(180deg, #075E54 0%, #054d44 40%, #02332e 100%)',
       }}
     >
-      {/* Top bar */}
+      {/* Top */}
       <div className="flex items-center justify-between px-5 pb-2 pt-14">
-        <span className="text-xs text-white/60">KYNS Voice</span>
-        <span className="text-xs font-medium tabular-nums text-white/80">{fmt(duration)}</span>
+        <span className="text-xs text-white/50">KYNS Voice</span>
+        <span className="text-xs font-medium tabular-nums text-white/70">{fmt(duration)}</span>
       </div>
 
       {/* Center */}
       <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
-        <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-white/20 bg-white/10 shadow-2xl">
+        {/* Avatar */}
+        <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-[3px] border-white/20 bg-white/10 shadow-2xl">
           {agentAvatar ?? (
-            <span className="text-5xl font-bold text-white/80">
+            <span className="text-4xl font-bold text-white/80">
               {agentName.charAt(0).toUpperCase()}
             </span>
           )}
         </div>
 
-        <div className="flex flex-col items-center gap-1">
+        <div className="flex flex-col items-center gap-1.5">
           <h2 className="text-2xl font-semibold text-white">{agentName}</h2>
-          <p className="text-sm text-emerald-200/80">{stateLabel[callState]}</p>
+          <p className="text-sm text-emerald-200/70">{label[callState]}</p>
         </div>
 
         {/* Waveform */}
         <div className="flex h-12 w-full max-w-xs items-center justify-center gap-[2px]">
-          {waveHeights.map((h, i) => (
+          {heights.map((h, i) => (
             <div
               key={i}
-              className={`w-[3px] rounded-full transition-all duration-100 ${waveColor[callState]}`}
+              className={`w-[3px] rounded-full transition-all duration-100 ${barColor[callState]}`}
               style={{ height: `${h}px` }}
             />
           ))}
         </div>
 
-        {/* Subtitle (last transcription) */}
         {subtitle && (
-          <p className="max-w-xs text-center text-xs text-white/40 italic">
+          <p className="max-w-xs text-center text-xs italic text-white/30">
             &ldquo;{subtitle}&rdquo;
           </p>
         )}
       </div>
 
-      {/* Bottom buttons */}
-      <div className="flex items-center justify-center gap-10 pb-16 pt-6">
-        {/* Mute */}
-        <button
-          type="button"
-          onClick={handleMuteToggle}
-          className={`flex h-14 w-14 items-center justify-center rounded-full transition-all ${
-            isMuted ? 'bg-red-500/30 text-red-300' : 'bg-white/15 text-white hover:bg-white/25'
-          }`}
-          aria-label={isMuted ? 'Ativar microfone' : 'Silenciar'}
-        >
-          {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-        </button>
-
+      {/* Bottom: two buttons only */}
+      <div className="flex items-center justify-center gap-12 pb-16 pt-6">
         {/* Hang up */}
         <button
           type="button"
@@ -262,27 +208,26 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({ agentName, agentAvata
           <PhoneOff className="h-7 w-7" />
         </button>
 
-        {/* Mic toggle (main action) */}
+        {/* Mic — single button */}
         <button
           type="button"
-          onClick={handleMicToggle}
-          disabled={isMuted || callState === 'connecting'}
-          className={`flex h-14 w-14 items-center justify-center rounded-full transition-all ${
+          onClick={handleMic}
+          disabled={micBusy}
+          className={`flex h-16 w-16 items-center justify-center rounded-full transition-all ${
             isListening
-              ? 'animate-pulse bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-              : callState === 'processing' || callState === 'speaking'
-                ? 'bg-white/10 text-white/40'
-                : 'bg-white/15 text-white hover:bg-white/25'
+              ? 'animate-pulse bg-emerald-500 text-white shadow-lg shadow-emerald-500/40'
+              : micBusy
+                ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                : 'bg-white/20 text-white shadow-lg hover:bg-white/30 active:scale-95'
           }`}
-          aria-label={isListening ? 'Parar de gravar' : 'Gravar'}
+          aria-label={isListening ? 'Parar de gravar' : 'Falar'}
         >
-          <Mic className="h-6 w-6" />
+          <Mic className="h-7 w-7" />
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
-
-  return createPortal(screen, document.body);
 };
 
 export default VoiceCallScreen;
