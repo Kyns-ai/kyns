@@ -1253,7 +1253,7 @@ class AgentClient extends BaseClient {
           ? '\n' + err.stack.split('\n').slice(0, 4).join('\n')
           : '';
         const isConnectionError =
-          /Connection error|terminated|ECONNREFUSED|ECONNRESET|fetch failed|ETIMEDOUT/i.test(rawMsg);
+          /Connection error|terminated|ECONNREFUSED|ECONNRESET|fetch failed|ETIMEDOUT|EngineCore/i.test(rawMsg);
         const userMessage = isConnectionError
           ? 'Falha de conexão com o servidor. Pode ser temporário — tente novamente em alguns instantes.'
           : `${rawMsg || 'Unknown error'}${stackHint}`;

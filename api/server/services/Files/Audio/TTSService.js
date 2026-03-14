@@ -114,7 +114,7 @@ class TTSService {
    * @throws {Error} If the selected voice is not available.
    */
   openAIProvider(ttsSchema, input, voice) {
-    const url = ttsSchema?.url || 'https://api.openai.com/v1/audio/speech';
+    const url = extractEnvVariable(ttsSchema?.url) || 'https://api.openai.com/v1/audio/speech';
 
     if (
       ttsSchema?.voices &&
@@ -188,7 +188,7 @@ class TTSService {
    */
   elevenLabsProvider(ttsSchema, input, voice, stream) {
     let url =
-      ttsSchema?.url ||
+      extractEnvVariable(ttsSchema?.url) ||
       `https://api.elevenlabs.io/v1/text-to-speech/${voice}${stream ? '/stream' : ''}`;
 
     if (!ttsSchema?.voices.includes(voice) && !ttsSchema?.voices.includes('ALL')) {
@@ -225,7 +225,7 @@ class TTSService {
    * @throws {Error} If the selected voice is not available.
    */
   localAIProvider(ttsSchema, input, voice) {
-    const url = ttsSchema?.url;
+    const url = extractEnvVariable(ttsSchema?.url);
 
     if (
       ttsSchema?.voices &&
