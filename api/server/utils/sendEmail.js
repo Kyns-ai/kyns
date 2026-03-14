@@ -18,7 +18,7 @@ const { logAxiosError, isEnabled, readFileAsString } = require('@librechat/api')
  * @param {string} params.html - The HTML content of the email.
  * @returns {Promise<Object>} - A promise that resolves to the response from Mailgun API.
  */
-const sendEmailViaMailgun = async ({ to, from, subject, html }) => {
+const sendEmailViaMailgun = async ({ to, from, subject, html, replyTo }) => {
   const mailgunApiKey = process.env.MAILGUN_API_KEY;
   const mailgunDomain = process.env.MAILGUN_DOMAIN;
   const mailgunHost = process.env.MAILGUN_HOST || 'https://api.mailgun.net';
@@ -33,6 +33,9 @@ const sendEmailViaMailgun = async ({ to, from, subject, html }) => {
   formData.append('subject', subject);
   formData.append('html', html);
   formData.append('o:tracking-clicks', 'no');
+  if (replyTo) {
+    formData.append('h:Reply-To', replyTo);
+  }
 
   try {
     const response = await axios.post(`${mailgunHost}/v3/${mailgunDomain}/messages`, formData, {
@@ -101,6 +104,8 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
     const fromEmail = process.env.EMAIL_FROM;
     const fromAddress = `"${fromName}" <${fromEmail}>`;
     const toAddress = `"${payload.name}" <${email}>`;
+    const replyToEmail = process.env.EMAIL_REPLY_TO;
+    const replyToAddress = replyToEmail ? `"${fromName}" <${replyToEmail}>` : undefined;
 
     // Check if Mailgun is configured
     if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
@@ -110,6 +115,7 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
         to: toAddress,
         subject: subject,
         html: html,
+        replyTo: replyToAddress,
       });
     }
 
@@ -156,6 +162,9 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
       subject: subject,
       html: html,
     };
+    if (replyToAddress) {
+      mailOptions.replyTo = replyToAddress;
+    }
 
     return await sendEmailViaSMTP({ transporterOptions, mailOptions });
   } catch (error) {
