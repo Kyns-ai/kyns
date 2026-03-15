@@ -228,6 +228,7 @@ endpoints:
     provider: "openAI"
     disableBuilder: false
     capabilities: ["deferred_tools", "execute_code", "file_search", "web_search", "actions", "context", "tools", "chain", "ocr"]
+    titlePrompt: "Provide a concise title (5 words or less) for the conversation in the same language as the conversation. Only return the title itself, no punctuation or quotation marks.\n\nConversation:\n{convo}"
     addParams:
       chat_template_kwargs:
         enable_thinking: false
@@ -246,6 +247,7 @@ endpoints:
       models:
         default: ["llmfan46/Qwen3.5-27B-heretic-v2"]
       titleConvo: true
+      titlePrompt: "Provide a concise title (5 words or less) for the conversation in the same language as the conversation. Only return the title itself, no punctuation or quotation marks.\n\nConversation:\n{convo}"
       summarize: false
       streamRate: 0
       addParams:
