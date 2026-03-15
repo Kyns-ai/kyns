@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { PhoneOff, Mic } from 'lucide-react';
 import useSoundEffects from '~/hooks/Audio/useSoundEffects';
 import { useAuthContext } from '~/hooks/AuthContext';
@@ -16,16 +17,6 @@ interface VoiceCallScreenProps {
 type CallState = 'connecting' | 'idle' | 'listening' | 'processing' | 'speaking';
 
 const BARS = 40;
-
-function clickRecorderButton() {
-  const btn = document.getElementById('audio-recorder');
-  if (btn) btn.click();
-}
-
-function isRecorderActive() {
-  const btn = document.getElementById('audio-recorder');
-  return btn?.getAttribute('aria-pressed') === 'true';
-}
 
 const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
   agentName,
@@ -43,7 +34,6 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const waveRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const alive = useRef(true);
   const wasSubmitting = useRef(false);
@@ -51,11 +41,62 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
 
   const isSubmitting = useRecoilValue(store.isSubmitting);
   const latestMessage = useRecoilValue(store.latestMessageFamily(0));
-  const setAutoTranscribe = useSetRecoilState(store.autoTranscribeAudio);
-  const setAutoSend = useSetRecoilState(store.autoSendText);
   const setAutoPlayback = useSetRecoilState(store.automaticPlayback);
 
-  // Speak text using TTS manual endpoint
+  // Browser speech recognition — direct, no dependency on AudioRecorder
+  const {
+    listening,
+    finalTranscript,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+  } = useSpeechRecognition();
+
+  // Submit transcript as chat message by clicking the hidden send mechanism
+  const submitText = useCallback(
+    (text: string) => {
+      if (!text.trim()) return;
+      setSubtitle(text.length > 60 ? `${text.substring(0, 60)}...` : text);
+      setCallState('processing');
+
+      // Set the text in the chat textarea and submit
+      const textarea = document.querySelector('textarea[data-testid="text-input"]') as HTMLTextAreaElement
+        ?? document.querySelector('#prompt-textarea') as HTMLTextAreaElement
+        ?? document.querySelector('textarea') as HTMLTextAreaElement;
+
+      if (textarea) {
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLTextAreaElement.prototype, 'value',
+        )?.set;
+        nativeInputValueSetter?.call(textarea, text);
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Click send button after a tick
+        setTimeout(() => {
+          const sendBtn = document.querySelector('[data-testid="send-button"]') as HTMLButtonElement
+            ?? document.querySelector('button[type="submit"]') as HTMLButtonElement;
+          if (sendBtn && !sendBtn.disabled) {
+            sendBtn.click();
+          } else {
+            // Trigger form submit via Enter key
+            textarea.dispatchEvent(new KeyboardEvent('keydown', {
+              key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true,
+            }));
+          }
+        }, 50);
+      }
+    },
+    [],
+  );
+
+  // When finalTranscript arrives, submit it
+  useEffect(() => {
+    if (finalTranscript && finalTranscript.trim().length > 0) {
+      submitText(finalTranscript);
+      resetTranscript();
+    }
+  }, [finalTranscript, submitText, resetTranscript]);
+
+  // Speak text via ElevenLabs TTS
   const speakText = useCallback(
     async (text: string) => {
       if (!text.trim() || !token || !alive.current) return;
@@ -86,7 +127,6 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
           audioRef.current = null;
           if (alive.current) setCallState('idle');
         };
-
         audio.onerror = () => {
           URL.revokeObjectURL(url);
           audioRef.current = null;
@@ -103,20 +143,8 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
 
   // Mount
   useEffect(() => {
-    setAutoTranscribe(true);
-    setAutoSend(0);
     setAutoPlayback(false); // We handle TTS ourselves
     timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
-
-    pollRef.current = setInterval(() => {
-      if (!alive.current) return;
-      const recording = isRecorderActive();
-      setCallState((prev) => {
-        if (recording && prev !== 'listening') return 'listening';
-        if (!recording && prev === 'listening') return 'processing';
-        return prev;
-      });
-    }, 200);
 
     const t = setTimeout(() => {
       if (alive.current) {
@@ -129,18 +157,22 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
       alive.current = false;
       if (timerRef.current) clearInterval(timerRef.current);
       if (waveRef.current) clearInterval(waveRef.current);
-      if (pollRef.current) clearInterval(pollRef.current);
       clearTimeout(t);
+      SpeechRecognition.abortListening();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-      if (isRecorderActive()) clickRecorderButton();
-      setAutoTranscribe(false);
-      setAutoSend(-1);
       setAutoPlayback(false);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync callState with listening
+  useEffect(() => {
+    if (listening) {
+      setCallState('listening');
+    }
+  }, [listening]);
 
   // When AI finishes responding, speak the response
   useEffect(() => {
@@ -151,7 +183,6 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
       wasSubmitting.current = false;
       if (!alive.current) return;
 
-      // Get the AI response text
       const text = latestMessage?.text ?? '';
       if (text && !latestMessage?.isCreatedByUser && text !== lastSpokenText.current) {
         lastSpokenText.current = text;
@@ -188,23 +219,26 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
 
   const handleMic = useCallback(() => {
     playClick();
-    clickRecorderButton();
-  }, [playClick]);
+    if (!browserSupportsSpeechRecognition) return;
+    if (listening) {
+      SpeechRecognition.stopListening();
+    } else {
+      SpeechRecognition.startListening({ language: 'pt-BR', continuous: true });
+    }
+  }, [playClick, listening, browserSupportsSpeechRecognition]);
 
   const handleEnd = useCallback(() => {
     playHangup();
+    SpeechRecognition.abortListening();
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    if (isRecorderActive()) clickRecorderButton();
     setTimeout(onEnd, 400);
   }, [playHangup, onEnd]);
 
   const fmt = (s: number) =>
-    `${Math.floor(s / 60)
-      .toString()
-      .padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+    `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
   const label: Record<CallState, string> = {
     connecting: 'Conectando...',

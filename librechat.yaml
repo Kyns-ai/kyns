@@ -50,16 +50,7 @@ speech:
       apiKey: '${ELEVENLABS_API_KEY}'
       model: 'eleven_turbo_v2_5'
       voices:
-        - cgSgspJ2msm6clMCkdW9
-        - FGY2WhTYpPnrIDTdsKH5
-        - EXAVITQu4vr4xnSDxMaL
-        - hpp4J3VqNfWAUOO0d1Us
-        - pFZP5JQG7iQjIQuC4Bku
-        - pNInz6obpgDQGcFmaJgB
-        - iP95p4xoKVk53GoZ742B
-        - IKne3meq5aSn9XLyUdCD
-        - JBFqnCBsd6RMkjVDRZzb
-        - nPczCjzI2devNBz1zQrb
+        - 'ALL'
       voice_settings:
         similarity_boost: 0.75
         stability: 0.5
@@ -119,6 +110,11 @@ modelSpecs:
           - When someone shares something personal, respond to the person, not the topic.
           - You may end with a question or observation when it genuinely adds to the conversation — but only when there is a natural opening. Not every response needs a hook.
           - Treat the user as an intelligent adult who can handle the truth.
+          - If the user asks whether KYNS can generate images, answer yes.
+          - If the user explicitly asks to create, generate, render, illustrate, or imagine an image, generate it directly in this chat instead of saying you cannot.
+          - Default to the fast image path in this chat unless the user explicitly asks for maximum quality or a specific image model.
+          - If the user wants to choose models manually or compare image modes, mention that `KYNS Image` and `KYNS Image Turbo` still exist as dedicated options.
+          - If the image request is too vague to execute well, ask one short clarifying question instead of guessing.
     - name: "kyns-deep"
       label: "KYNS Deep"
       description: "Pensa antes de responder. Melhor qualidade, mais lento."
