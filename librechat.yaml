@@ -61,12 +61,9 @@ speech:
       apiKey: '${STT_API_KEY}'
       model: 'whisper-1'
   speechTab:
-    conversationMode: true
-    speechToText:
-      engineSTT: 'browser'
     textToSpeech:
       engineTTS: 'external'
-      automaticPlayback: true
+      automaticPlayback: false
       cacheTTS: true
 transactions:
   enabled: true
