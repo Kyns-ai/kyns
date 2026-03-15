@@ -16,6 +16,7 @@ import type { TResData } from '~/common';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
+import { safeParseSSEData } from './utils';
 import store from '~/store';
 
 const clearDraft = (conversationId?: string | null) => {
@@ -108,16 +109,19 @@ export default function useSSE(
     });
 
     sse.addEventListener('attachment', (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data);
-        attachmentHandler({ data, submission: submission as EventSubmission });
-      } catch (error) {
-        console.error(error);
+      const data = safeParseSSEData<Record<string, unknown>>(e.data, 'attachment');
+      if (data == null) {
+        return;
       }
+
+      attachmentHandler({ data, submission: submission as EventSubmission });
     });
 
     sse.addEventListener('message', (e: MessageEvent) => {
-      const data = JSON.parse(e.data);
+      const data = safeParseSSEData<Record<string, unknown>>(e.data, 'message');
+      if (data == null) {
+        return;
+      }
 
       if (data.final != null) {
         clearDraft(submission.conversation?.conversationId);
@@ -232,11 +236,8 @@ export default function useSSE(
       console.log('error in server stream.');
       (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
 
-      let data: TResData | undefined = undefined;
-      try {
-        data = JSON.parse(e.data) as TResData;
-      } catch (error) {
-        console.error(error);
+      const data = safeParseSSEData<TResData>(e.data, 'error') ?? undefined;
+      if (data == null) {
         console.log(e);
         setIsSubmitting(false);
       }

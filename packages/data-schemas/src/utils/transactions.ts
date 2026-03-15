@@ -49,9 +49,9 @@ export const getTransactionSupport = async (
   mongoose: typeof import('mongoose'),
   transactionSupportCache: boolean | null,
 ): Promise<boolean> => {
-  let transactionsSupported = false;
-  if (transactionSupportCache === null) {
-    transactionsSupported = await supportsTransactions(mongoose);
+  if (transactionSupportCache !== null) {
+    return transactionSupportCache;
   }
-  return transactionsSupported;
+
+  return supportsTransactions(mongoose);
 };

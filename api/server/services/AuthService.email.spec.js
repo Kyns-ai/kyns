@@ -204,6 +204,27 @@ describe('AuthService email flow', () => {
     );
   });
 
+  it('acknowledges password reset requests without returning a link when email is disabled', async () => {
+    checkEmailConfig.mockReturnValue(false);
+    findUser.mockResolvedValue({
+      _id: 'user-1',
+      email: 'kyne2e@example.com',
+      name: 'KYNS Teste',
+    });
+
+    const result = await requestPasswordReset({
+      body: { email: 'kyne2e@example.com' },
+      ip: '127.0.0.1',
+    });
+
+    expect(result).toEqual({
+      message: 'Se existir uma conta com esse e-mail, enviaremos um link para redefinir sua senha.',
+    });
+    expect(deleteTokens).not.toHaveBeenCalled();
+    expect(createToken).not.toHaveBeenCalled();
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
   it('sends the password reset confirmation email with the production subject', async () => {
     const rawToken = 'reset-token-123';
 

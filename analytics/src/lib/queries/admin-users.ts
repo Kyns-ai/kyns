@@ -1,6 +1,10 @@
 import { ObjectId } from 'mongodb'
 import { getCollection } from '../mongodb'
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 export interface AdminUser {
   _id: string
   name: string
@@ -47,7 +51,7 @@ export async function getUserList(opts: {
 
   const match: Record<string, unknown> = {}
   if (opts.search) {
-    const re = new RegExp(opts.search, 'i')
+    const re = new RegExp(escapeRegExp(opts.search), 'i')
     match['$or'] = [{ name: re }, { email: re }]
   }
   if (opts.status === 'banned') match['banned'] = true

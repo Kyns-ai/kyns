@@ -2499,12 +2499,15 @@ describe('AgentClient - prepareManualWebSearch', () => {
 describe('AgentClient - KYNS image bypass', () => {
   let client;
   let originalFetch;
+  let originalImageProxyKey;
   let mockReq;
   let mockOptions;
 
   beforeEach(() => {
     jest.clearAllMocks();
     originalFetch = global.fetch;
+    originalImageProxyKey = process.env.IMAGE_PROXY_KEY;
+    process.env.IMAGE_PROXY_KEY = 'test-image-proxy-key';
     global.fetch = jest.fn();
 
     mockReq = {
@@ -2537,6 +2540,11 @@ describe('AgentClient - KYNS image bypass', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    if (originalImageProxyKey === undefined) {
+      delete process.env.IMAGE_PROXY_KEY;
+      return;
+    }
+    process.env.IMAGE_PROXY_KEY = originalImageProxyKey;
   });
 
   it('bypasses the agent pipeline for explicit image requests on KYNS', async () => {
@@ -2555,13 +2563,34 @@ describe('AgentClient - KYNS image bypass', () => {
     const [url, init] = global.fetch.mock.calls[0];
     expect(url).toBe('http://127.0.0.1:3080/api/image-proxy/chat/completions');
     expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe('Bearer test-image-proxy-key');
     expect(JSON.parse(init.body)).toEqual({
       messages: [{ role: 'user', content: 'Gere uma imagem de um gato astronauta flutuando no espaço.' }],
       model: 'zimage',
+      userId: 'user-123',
     });
+    const decodedUserToken = require('jsonwebtoken').verify(
+      init.headers['X-KYNS-User-Token'],
+      'test-image-proxy-key',
+      {
+        audience: 'image-proxy-user',
+      },
+    );
+    expect(decodedUserToken.sub).toBe('user-123');
 
     expect(result.completion).toEqual([
       { type: 'text', text: '![Imagem gerada](https://example.com/image.png)' },
+    ]);
+  });
+
+  it('fails closed when the image proxy key is missing', async () => {
+    delete process.env.IMAGE_PROXY_KEY;
+
+    const result = await client.sendCompletion([]);
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(result.completion).toEqual([
+      { type: 'text', text: 'Geração de imagens não configurada. Contate o administrador.' },
     ]);
   });
 

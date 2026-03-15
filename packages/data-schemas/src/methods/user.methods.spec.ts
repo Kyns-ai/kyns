@@ -322,6 +322,20 @@ describe('User Methods - Database Tests', () => {
 
       expect(found).toBeNull();
     });
+
+    test('should exclude refreshToken by default', async () => {
+      const user = await User.create({
+        name: 'Token User',
+        email: 'token-user@example.com',
+        provider: 'local',
+        refreshToken: [{ refreshToken: 'sensitive-refresh-token' }],
+      });
+
+      const found = await methods.getUserById(user._id?.toString() || '');
+
+      expect(found).toBeDefined();
+      expect(found).not.toHaveProperty('refreshToken');
+    });
   });
 
   describe('deleteUserById', () => {
@@ -462,6 +476,16 @@ describe('User Methods - Database Tests', () => {
 
       /** 'alice' username should score highest due to exact match */
       expect((results[0] as unknown as t.IUser).username).toBe('alice');
+    });
+
+    test('should treat regex metacharacters literally', async () => {
+      const results = await methods.searchUsers({ searchPattern: 'john.*' });
+
+      expect(results).toEqual([]);
+    });
+
+    test('should not throw on invalid regex characters', async () => {
+      await expect(methods.searchUsers({ searchPattern: '(' })).resolves.toEqual([]);
     });
   });
 

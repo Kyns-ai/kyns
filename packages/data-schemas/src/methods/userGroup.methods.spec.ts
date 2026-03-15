@@ -193,6 +193,42 @@ describe('UserGroup Methods - Detailed Tests', () => {
 
       expect(groups).toEqual([]);
     });
+
+    test('should treat regex metacharacters literally', async () => {
+      const groups = await methods.findGroupsByNamePattern('Engineering|Marketing');
+
+      expect(groups).toEqual([]);
+    });
+
+    test('should not throw on invalid regex characters', async () => {
+      await expect(methods.findGroupsByNamePattern('(')).resolves.toEqual([]);
+    });
+  });
+
+  describe('searchPrincipals', () => {
+    beforeEach(async () => {
+      await User.create({
+        name: 'Alice (Admin)',
+        email: 'alice-admin@test.com',
+        username: 'alice-admin',
+        provider: 'local',
+      });
+
+      await Group.create({
+        name: 'Engineering (Contractors)',
+        source: 'local',
+        memberIds: [],
+      });
+    });
+
+    test('should support literal special characters without throwing', async () => {
+      const results = await methods.searchPrincipals('(');
+
+      expect(results).toHaveLength(2);
+      expect(results.map((result) => result.name)).toEqual(
+        expect.arrayContaining(['Alice (Admin)', 'Engineering (Contractors)']),
+      );
+    });
   });
 
   describe('findGroupsByMemberId', () => {

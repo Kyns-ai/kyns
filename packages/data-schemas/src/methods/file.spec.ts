@@ -3,12 +3,20 @@ import { v4 as uuidv4 } from 'uuid';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { EToolResources, FileContext } from 'librechat-data-provider';
 import { createFileMethods } from './file';
-import { createModels } from '~/models';
+import fileSchema from '~/schema/file';
+
+jest.mock('~/config/winston', () => ({
+  __esModule: true,
+  default: {
+    error: jest.fn(),
+    info: jest.fn(),
+  },
+}));
 
 let File: mongoose.Model<unknown>;
 let fileMethods: ReturnType<typeof createFileMethods>;
 let mongoServer: MongoMemoryServer;
-let modelsToCleanup: string[] = [];
+const modelsToCleanup = ['File'];
 
 describe('File Methods', () => {
   beforeAll(async () => {
@@ -16,11 +24,8 @@ describe('File Methods', () => {
     const mongoUri = mongoServer.getUri();
     await mongoose.connect(mongoUri);
 
-    const models = createModels(mongoose);
-    modelsToCleanup = Object.keys(models);
-    Object.assign(mongoose.models, models);
-
-    File = mongoose.models.File as mongoose.Model<unknown>;
+    File =
+      mongoose.models.File || mongoose.model('File', fileSchema);
     fileMethods = createFileMethods(mongoose);
   });
 
@@ -493,6 +498,38 @@ describe('File Methods', () => {
       const remaining = await fileMethods.getFiles({});
       expect(remaining).toHaveLength(1);
       expect(remaining![0].user?.toString()).toBe(otherUserId.toString());
+    });
+
+    it('should combine file_ids and user filters when both are provided', async () => {
+      const userId = new mongoose.Types.ObjectId();
+      const otherUserId = new mongoose.Types.ObjectId();
+      const ownedFileId = uuidv4();
+      const otherFileId = uuidv4();
+
+      await fileMethods.createFile({
+        file_id: ownedFileId,
+        user: userId,
+        filename: 'owned-file.txt',
+        filepath: '/uploads/owned-file.txt',
+        type: 'text/plain',
+        bytes: 100,
+      });
+
+      await fileMethods.createFile({
+        file_id: otherFileId,
+        user: otherUserId,
+        filename: 'other-file.txt',
+        filepath: '/uploads/other-file.txt',
+        type: 'text/plain',
+        bytes: 100,
+      });
+
+      const result = await fileMethods.deleteFiles([ownedFileId, otherFileId], userId.toString());
+      expect(result.deletedCount).toBe(1);
+
+      const remaining = await fileMethods.getFiles({});
+      expect(remaining).toHaveLength(1);
+      expect(remaining![0].file_id).toBe(otherFileId);
     });
   });
 

@@ -292,14 +292,24 @@ export function createFileMethods(mongoose: typeof import('mongoose')) {
    * @returns A promise that resolves to the result of the deletion operation
    */
   async function deleteFiles(
-    file_ids: string[],
+    file_ids: string[] | null = null,
     user?: string,
   ): Promise<{ deletedCount?: number }> {
     const File = mongoose.models.File as Model<IMongoFile>;
-    let deleteQuery: FilterQuery<IMongoFile> = { file_id: { $in: file_ids } };
-    if (user) {
-      deleteQuery = { user: user };
+    const deleteQuery: FilterQuery<IMongoFile> = {};
+
+    if (file_ids != null && file_ids.length > 0) {
+      deleteQuery.file_id = { $in: file_ids };
     }
+
+    if (user) {
+      deleteQuery.user = user;
+    }
+
+    if (Object.keys(deleteQuery).length === 0) {
+      return { deletedCount: 0 };
+    }
+
     return File.deleteMany(deleteQuery);
   }
 

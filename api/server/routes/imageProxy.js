@@ -5,11 +5,11 @@ const rateLimit = require('express-rate-limit');
 const { v4: uuidv4 } = require('uuid');
 const express = require('express');
 const sharp = require('sharp');
+const jwt = require('jsonwebtoken');
 const { limiterCache } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const paths = require('~/config/paths');
 
-const PROXY_API_KEY = process.env.IMAGE_PROXY_KEY || 'kyns-image-internal';
 const POLL_INTERVAL_MS = 5000;
 const POLL_TIMEOUT_MS = 420_000;
 const NO_WORKER_CANCEL_MS = 300_000;
@@ -18,11 +18,26 @@ const IMAGE_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const RUNPOD_SUBMIT_TIMEOUT_MS = 30_000;
 const RUNPOD_POLL_REQUEST_TIMEOUT_MS = 20_000;
 const WATERMARK_TEXT = 'kyns.ai';
+const PROXY_AUTH_SCHEME = 'Bearer';
+const IMAGE_PROXY_USER_TOKEN_AUDIENCE = 'image-proxy-user';
 
 const router = express.Router();
 
 const getRunpodKey = () => process.env.RUNPOD_IMAGE_API_KEY || process.env.RUNPOD_API_KEY || '';
 const getEndpointId = () => process.env.RUNPOD_IMAGE_ENDPOINT_ID || '';
+const getProxyApiKey = () => process.env.IMAGE_PROXY_KEY?.trim() || '';
+
+function getHeaderValue(value) {
+  if (Array.isArray(value)) {
+    return value[0] ?? '';
+  }
+  return typeof value === 'string' ? value : '';
+}
+
+function getExpectedAuthHeader() {
+  const proxyApiKey = getProxyApiKey();
+  return proxyApiKey ? `${PROXY_AUTH_SCHEME} ${proxyApiKey}` : '';
+}
 
 function ensureGeneratedDir() {
   const dir = path.join(paths.imageOutput, 'generated');
@@ -54,14 +69,30 @@ async function addWatermark(buffer) {
 }
 
 function getRequesterUserId(req) {
-  const headerUserId = req.headers['x-kyns-user-id'];
-  if (Array.isArray(headerUserId)) {
-    return headerUserId[0] ?? null;
+  if (req.imageProxyUserId) {
+    return req.imageProxyUserId;
   }
-  if (typeof headerUserId === 'string' && headerUserId.length > 0) {
-    return headerUserId;
+  if (typeof req.body?.userId === 'string' && req.body.userId.length > 0) {
+    return req.body.userId;
   }
   return req.user?.id ?? req.body?.userId ?? null;
+}
+
+function getSignedRequesterUserId(req) {
+  const signedUserToken = getHeaderValue(req.headers['x-kyns-user-token']);
+  if (!signedUserToken) {
+    return undefined;
+  }
+
+  try {
+    const payload = jwt.verify(signedUserToken, getProxyApiKey(), {
+      audience: IMAGE_PROXY_USER_TOKEN_AUDIENCE,
+    });
+    return typeof payload?.sub === 'string' && payload.sub.length > 0 ? payload.sub : null;
+  } catch (error) {
+    logger.warn('[imageProxy] Invalid signed user token');
+    return null;
+  }
 }
 
 function makeDailyLimitMessage() {
@@ -169,13 +200,34 @@ const imageGenerationLimiter = rateLimit({
   handler: (_req, res) => res.status(200).json(makeResponse(makeDailyLimitMessage())),
 });
 
+function authenticateImageProxyRequest(req, res, next) {
+  const expectedAuthHeader = getExpectedAuthHeader();
+  if (!expectedAuthHeader) {
+    logger.error('[imageProxy] IMAGE_PROXY_KEY is required');
+    return res.status(503).json({
+      error: { message: 'Image proxy is not configured', type: 'config_error' },
+    });
+  }
+
+  const authHeader = getHeaderValue(req.headers.authorization);
+  if (authHeader !== expectedAuthHeader) {
+    return res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_error' } });
+  }
+
+  const signedRequesterUserId = getSignedRequesterUserId(req);
+  if (signedRequesterUserId === null) {
+    return res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_error' } });
+  }
+
+  if (signedRequesterUserId) {
+    req.imageProxyUserId = signedRequesterUserId;
+  }
+
+  next();
+}
+
 async function imageRequestHandler(req, res) {
   try {
-    const authHeader = req.headers.authorization || '';
-    if (!authHeader.includes(PROXY_API_KEY)) {
-      return res.status(401).json({ error: { message: 'Unauthorized', type: 'auth_error' } });
-    }
-
     const apiKey = getRunpodKey();
     const endpointId = getEndpointId();
 
@@ -265,7 +317,7 @@ async function imageRequestHandler(req, res) {
   }
 }
 
-router.post('/chat/completions', imageGenerationLimiter, imageRequestHandler);
-router.post('/v1/chat/completions', imageGenerationLimiter, imageRequestHandler);
+router.post('/chat/completions', authenticateImageProxyRequest, imageGenerationLimiter, imageRequestHandler);
+router.post('/v1/chat/completions', authenticateImageProxyRequest, imageGenerationLimiter, imageRequestHandler);
 
 module.exports = router;

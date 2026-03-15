@@ -3,6 +3,7 @@ import { PrincipalType } from 'librechat-data-provider';
 import type { TUser, TPrincipalSearchResult } from 'librechat-data-provider';
 import type { Model, ClientSession } from 'mongoose';
 import type { IGroup, IRole, IUser } from '~/types';
+import { escapeRegExp } from '~/utils/regex';
 
 export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
   /**
@@ -62,7 +63,7 @@ export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
     session?: ClientSession,
   ): Promise<IGroup[]> {
     const Group = mongoose.models.Group as Model<IGroup>;
-    const regex = new RegExp(namePattern, 'i');
+    const regex = new RegExp(escapeRegExp(namePattern), 'i');
     const query: Record<string, unknown> = {
       $or: [{ name: regex }, { email: regex }, { description: regex }],
     };
@@ -395,7 +396,7 @@ export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
    * @returns Relevance score (0-100)
    */
   function calculateRelevanceScore(item: TPrincipalSearchResult, searchPattern: string): number {
-    const exactRegex = new RegExp(`^${searchPattern}$`, 'i');
+    const exactRegex = new RegExp(`^${escapeRegExp(searchPattern)}$`, 'i');
     const startsWithPattern = searchPattern.toLowerCase();
 
     /** Get searchable text based on type */
@@ -510,6 +511,7 @@ export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
     }
 
     const trimmedPattern = searchPattern.trim();
+    const escapedPattern = escapeRegExp(trimmedPattern);
     const promises: Promise<TPrincipalSearchResult[]>[] = [];
 
     if (!typeFilter || typeFilter.includes(PrincipalType.USER)) {
@@ -517,7 +519,7 @@ export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
       const userFields = 'name email username avatar provider idOnTheSource';
       /** For now, we'll use a direct query instead of searchUsers */
       const User = mongoose.models.User as Model<IUser>;
-      const regex = new RegExp(trimmedPattern, 'i');
+      const regex = new RegExp(escapedPattern, 'i');
       const userQuery = User.find({
         $or: [{ name: regex }, { email: regex }, { username: regex }],
       })
@@ -560,7 +562,7 @@ export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
     if (!typeFilter || typeFilter.includes(PrincipalType.ROLE)) {
       const Role = mongoose.models.Role as Model<IRole>;
       if (Role) {
-        const regex = new RegExp(trimmedPattern, 'i');
+        const regex = new RegExp(escapedPattern, 'i');
         const roleQuery = Role.find({ name: regex }).select('name').limit(limitPerType);
 
         if (session) {

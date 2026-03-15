@@ -205,9 +205,15 @@ const deleteFileByFilter = async (filter) => {
  * @returns {Promise<Object>} A promise that resolves to the result of the deletion operation.
  */
 const deleteFiles = async (file_ids, user) => {
-  let deleteQuery = { file_id: { $in: file_ids } };
+  const deleteQuery = {};
+  if (file_ids != null && file_ids.length > 0) {
+    deleteQuery.file_id = { $in: file_ids };
+  }
   if (user) {
-    deleteQuery = { user: user };
+    deleteQuery.user = user;
+  }
+  if (Object.keys(deleteQuery).length === 0) {
+    return { deletedCount: 0 };
   }
   return await File.deleteMany(deleteQuery);
 };

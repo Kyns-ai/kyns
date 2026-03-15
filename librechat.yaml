@@ -259,7 +259,7 @@ endpoints:
         top_k: 20
         max_tokens: 8192
     - name: "KYNSImage"
-      apiKey: "kyns-image-internal"
+      apiKey: "${IMAGE_PROXY_KEY}"
       baseURL: "http://127.0.0.1:${PORT}/api/image-proxy"
       iconURL: "https://raw.githubusercontent.com/Kyns-ai/config/main/files/kyns-favicon-32.png"
       modelDisplayLabel: "KYNS Image"

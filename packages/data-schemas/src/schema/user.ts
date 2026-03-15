@@ -123,6 +123,7 @@ const userSchema = new Schema<IUser>(
     },
     refreshToken: {
       type: [SessionSchema],
+      select: false,
     },
     expiresAt: {
       type: Date,

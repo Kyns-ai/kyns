@@ -352,6 +352,16 @@ const requestPasswordReset = async (req) => {
     };
   }
 
+  if (!emailEnabled) {
+    logger.warn(
+      `[requestPasswordReset] Email not configured. Request acknowledged without issuing a reset link. ` +
+        `[Email: ${email}] [ID: ${user._id}] [IP: ${req.ip}]`,
+    );
+    return {
+      message: genericPasswordResetMessage,
+    };
+  }
+
   await deleteTokens({ userId: user._id });
 
   const [resetToken, hash] = createTokenHash();
@@ -365,22 +375,15 @@ const requestPasswordReset = async (req) => {
 
   const link = `${domains.client}/reset-password?token=${resetToken}&userId=${user._id}`;
 
-  if (emailEnabled) {
-    await sendEmail({
-      email: user.email,
-      subject: passwordResetRequestSubject,
-      payload: getEmailPayload(user, { link }),
-      template: 'requestPasswordReset.handlebars',
-    });
-    logger.info(
-      `[requestPasswordReset] Link emailed. [Email: ${email}] [ID: ${user._id}] [IP: ${req.ip}]`,
-    );
-  } else {
-    logger.info(
-      `[requestPasswordReset] Link issued. [Email: ${email}] [ID: ${user._id}] [IP: ${req.ip}]`,
-    );
-    return { link };
-  }
+  await sendEmail({
+    email: user.email,
+    subject: passwordResetRequestSubject,
+    payload: getEmailPayload(user, { link }),
+    template: 'requestPasswordReset.handlebars',
+  });
+  logger.info(
+    `[requestPasswordReset] Link emailed. [Email: ${email}] [ID: ${user._id}] [IP: ${req.ip}]`,
+  );
 
   return {
     message: genericPasswordResetMessage,

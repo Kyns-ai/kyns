@@ -1,4 +1,5 @@
 require('events').EventEmitter.defaultMaxListeners = 100;
+const jwt = require('jsonwebtoken');
 const { logger } = require('@librechat/data-schemas');
 const { getBufferString, HumanMessage } = require('@langchain/core/messages');
 const {
@@ -1059,23 +1060,43 @@ class AgentClient extends BaseClient {
         : 'flux2klein'
       : this.getKynsImageRequestedModel();
     const requestUserId = this.user ?? this.options.req?.user?.id;
+    const proxyApiKey = process.env.IMAGE_PROXY_KEY?.trim();
     logger.info(`[KYNSImage] spec=${spec} → model=${model}`);
+
+    if (!proxyApiKey) {
+      logger.error('[KYNSImage] IMAGE_PROXY_KEY is required for image proxy requests');
+      return 'Geração de imagens não configurada. Contate o administrador.';
+    }
+
+    if (requestUserId == null) {
+      logger.error('[KYNSImage] Missing user id for image proxy request');
+      return 'Erro ao gerar imagem. Tente novamente.';
+    }
+
+    const requesterToken = jwt.sign({ sub: String(requestUserId) }, proxyApiKey, {
+      audience: 'image-proxy-user',
+      expiresIn: '5m',
+    });
 
     const response = await fetch(`http://127.0.0.1:${port}/api/image-proxy/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer kyns-image-internal',
-        'X-KYNS-User-ID': requestUserId != null ? String(requestUserId) : '',
+        Authorization: `Bearer ${proxyApiKey}`,
+        'X-KYNS-User-Token': requesterToken,
       },
       body: JSON.stringify({
         messages: [{ role: 'user', content: userText }],
         model,
+        userId: String(requestUserId),
       }),
     });
 
     if (!response.ok) {
       logger.error(`[KYNSImage] imageProxy returned ${response.status}`);
+      if (response.status === 503) {
+        return 'Geração de imagens não configurada. Contate o administrador.';
+      }
       return 'Erro ao gerar imagem. Tente novamente.';
     }
 
