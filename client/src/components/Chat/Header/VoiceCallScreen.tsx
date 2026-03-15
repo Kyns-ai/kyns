@@ -39,7 +39,7 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
   const wasSubmitting = useRef(false);
   const lastSpokenText = useRef('');
 
-  const isSubmitting = useRecoilValue(store.isSubmitting);
+  const isSubmitting = useRecoilValue(store.isSubmittingFamily(0));
   const latestMessage = useRecoilValue(store.latestMessageFamily(0));
   const setAutoPlayback = useSetRecoilState(store.automaticPlayback);
 
@@ -99,6 +99,7 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
   // Speak text via ElevenLabs TTS
   const speakText = useCallback(
     async (text: string) => {
+      console.log('[VoiceCall] speakText called:', { text: text.substring(0, 50), voice: agentVoice, hasToken: !!token, alive: alive.current });
       if (!text.trim() || !token || !alive.current) return;
       try {
         setCallState('speaking');
@@ -176,6 +177,7 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
 
   // When AI finishes responding, speak the response
   useEffect(() => {
+    console.log('[VoiceCall] isSubmitting changed:', isSubmitting, 'wasSubmitting:', wasSubmitting.current, 'latestMessage:', latestMessage?.text?.substring(0, 30), 'isUser:', latestMessage?.isCreatedByUser);
     if (isSubmitting) {
       wasSubmitting.current = true;
       setCallState('processing');
@@ -189,6 +191,7 @@ const VoiceCallScreen: React.FC<VoiceCallScreenProps> = ({
         setSubtitle(text.length > 60 ? `${text.substring(0, 60)}...` : text);
         speakText(text);
       } else {
+        console.log('[VoiceCall] NOT speaking:', { text: !!text, isUser: latestMessage?.isCreatedByUser, alreadySpoken: text === lastSpokenText.current });
         setCallState('idle');
       }
     }
