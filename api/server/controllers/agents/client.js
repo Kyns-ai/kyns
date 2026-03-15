@@ -523,7 +523,7 @@ class AgentClient extends BaseClient {
   /**
    * Creates a promise that resolves with the memory promise result or undefined after a timeout
    * @param {Promise<(TAttachment | null)[] | undefined>} memoryPromise - The memory promise to await
-   * @param {number} timeoutMs - Timeout in milliseconds (default: 3000)
+   * @param {number} timeoutMs - Timeout in milliseconds (default: 45000)
    * @returns {Promise<(TAttachment | null)[] | undefined>}
    */
   async awaitMemoryWithTimeout(memoryPromise, timeoutMs = 45000) {
@@ -1441,9 +1441,18 @@ class AgentClient extends BaseClient {
       }
     } finally {
       try {
-        const attachments = await this.awaitMemoryWithTimeout(memoryPromise);
-        if (attachments && attachments.length > 0) {
-          this.artifactPromises.push(...attachments);
+        if (memoryPromise) {
+          memoryPromise
+            .then((attachments) => {
+              if (attachments && attachments.length > 0) {
+                logger.debug(
+                  `[AgentClient] Memory completed in background with ${attachments.length} attachment(s)`,
+                );
+              }
+            })
+            .catch((err) => {
+              logger.error('[AgentClient] Background memory processing error:', err);
+            });
         }
 
         /** Skip token spending if aborted - the abort handler (abortMiddleware.js) handles it
