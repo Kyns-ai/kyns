@@ -105,6 +105,22 @@ const ABSOLUTE_BLOCK_PATTERNS = [
   /\bpedofil\w*\b/i,
 ];
 
+const SELF_HARM_CVV_RESPONSE =
+  'Ei — isso que você está sentindo é real e merece atenção. ' +
+  'Se estiver em crise, fala com o CVV agora: ligue **188** (24h, gratuito) ou acesse cvv.org.br. ' +
+  'Estou aqui se quiser conversar.';
+
+const SELF_HARM_METHOD_PATTERNS = [
+  /\bcomo\b.{0,60}\b(enforc|me\s+matar|se\s+matar|suicid|tomar\s+overdose|se\s+suicidar)\b/i,
+  /\b(metodo|método|técnica|tecnica|forma|jeito|maneira|tutorial|guia|instrucao|instrução|passo\s+a\s+passo)\b.{0,60}\b(suicid|enforc|overdose|se\s+matar|me\s+matar)\b/i,
+  /\b(dose|dosagem|quantidade).{0,40}\b(letal|matar|fatal|overdose)\b/i,
+  /\b(quanto|quanta).{0,40}\b(remedios?|medicament\w+|comprimidos?).{0,40}\b(matar|overdose|fatal|letal)\b/i,
+  /\bescreva.{0,60}\b(carta\s+de\s+suicid|carta\s+de\s+despedida\s+final|nota\s+suicida)\b/i,
+  /\b(melhor|mais\s+eficaz|mais\s+r[aá]pido|menos\s+doloroso).{0,60}\b(suicid|morrer|se\s+matar|me\s+matar)\b/i,
+  /\bhow\s+to\s+(hang|kill\s+myself|commit\s+suicide|overdose)\b/i,
+  /\bsuicide\s+(method|technique|instruction|tutorial|guide|how\s+to)\b/i,
+];
+
 const REASONING_LEAK_PREFIX_PATTERNS = [
   /^here'?s a thinking process\b/i,
   /^thinking\s*\(/i,
@@ -169,6 +185,33 @@ function hasNonNegatedMinorTerm(normalizedText, patterns) {
   return false;
 }
 
+const EDUCATIONAL_CONTEXT_PATTERNS = [
+  /\b(consequencias?|consequências?)\b/i,
+  /\b(psicolog\w+|psiquiatr\w+|clinica|clínica|clinico|clínico)\b/i,
+  /\b(lei\s+brasileira|legisla\w+|juridic\w+|jurídic\w+|legal|ilegal)\b/i,
+  /\b(protec?ao|proteção|prevenc?ao|prevenção)\b/i,
+  /\b(vitima|vítima|sobrevivente)\b/i,
+  /\b(analise|análise|estudo|pesquisa|relatorio|relatório|artigo)\b/i,
+  /\b(explique?|explica|definic?ao|definição|conceito|o\s+que\s+[eé])\b/i,
+  /\b(impacto|efeito|trauma|recuperac?ao|recuperação|tratamento)\b/i,
+];
+
+function hasEducationalContext(normalizedText) {
+  return matchesAny(EDUCATIONAL_CONTEXT_PATTERNS, normalizedText);
+}
+
+function scanTextForSelfHarmMethod(text) {
+  const normalized = normalizeText(text);
+  if (!normalized.trim()) {
+    return { blocked: false };
+  }
+  const hasMethod = matchesAny(SELF_HARM_METHOD_PATTERNS, normalized);
+  if (hasMethod) {
+    return { blocked: true, reason: 'SELF_HARM_METHOD' };
+  }
+  return { blocked: false };
+}
+
 function scanTextForKynsPolicy(text) {
   const normalized = normalizeText(text);
   if (!normalized.trim()) {
@@ -180,17 +223,26 @@ function scanTextForKynsPolicy(text) {
     return { blocked: true, reason: 'ABSOLUTE_BLOCK' };
   }
 
+  const selfHarm = scanTextForSelfHarmMethod(text);
+  if (selfHarm.blocked) {
+    return selfHarm;
+  }
+
   const hasMinorTerm = hasNonNegatedMinorTerm(normalized, MINOR_PATTERNS);
   if (!hasMinorTerm) {
     return { blocked: false };
   }
 
   const hasSexualTerm = matchesAny(SEXUAL_PATTERNS, normalized);
-  if (hasSexualTerm) {
-    return { blocked: true, reason: 'CSAM_FILTER' };
+  if (!hasSexualTerm) {
+    return { blocked: false };
   }
 
-  return { blocked: false };
+  if (hasEducationalContext(normalized)) {
+    return { blocked: false };
+  }
+
+  return { blocked: true, reason: 'CSAM_FILTER' };
 }
 
 function extractVisibleTextFromDelta(data) {
@@ -345,8 +397,10 @@ module.exports = {
   BLOCKED_RESPONSE_REPLACEMENT,
   BLOCKED_USER_PLACEHOLDER,
   LOOP_INTERRUPTED_RESPONSE,
+  SELF_HARM_CVV_RESPONSE,
   KynsResponseFilteredError,
   prependKynsMasterPrompt,
   scanTextForKynsPolicy,
+  scanTextForSelfHarmMethod,
   createKynsResponseGuard,
 };

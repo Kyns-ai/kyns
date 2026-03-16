@@ -16,6 +16,7 @@ const { saveMessage, saveConvo } = require('~/models');
 const {
   BLOCKED_REQUEST_RESPONSE,
   BLOCKED_USER_PLACEHOLDER,
+  SELF_HARM_CVV_RESPONSE,
 } = require('~/server/services/safety/kynsPlatform');
 const {
   ensureKynsTrace,
@@ -75,14 +76,15 @@ async function emitBlockedSafetyResponse({
     endpoint: endpointOption.endpoint,
     user: userId,
   };
+  const responseText = reason === 'SELF_HARM_METHOD' ? SELF_HARM_CVV_RESPONSE : BLOCKED_REQUEST_RESPONSE;
   const responseMessage = {
     sender,
     messageId: responseMessageId,
     parentMessageId: userMessageId,
     conversationId,
     isCreatedByUser: false,
-    text: BLOCKED_REQUEST_RESPONSE,
-    content: [{ type: ContentTypes.TEXT, text: BLOCKED_REQUEST_RESPONSE }],
+    text: responseText,
+    content: [{ type: ContentTypes.TEXT, text: responseText }],
     unfinished: false,
     error: false,
     endpoint: endpointOption.endpoint,
