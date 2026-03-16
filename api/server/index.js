@@ -36,6 +36,7 @@ const { seedDatabase } = require('~/models');
 const routes = require('./routes');
 const { seedKynsImageAgent } = require('./services/kynsImageAgentSeed');
 const { syncAgentVoices } = require('./services/syncAgentVoices');
+const { startKynsDataRetention } = require('./services/kynsDataRetention');
 
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
 
@@ -228,6 +229,7 @@ const startServer = async () => {
     GenerationJobManager.initialize();
     seedKynsImageAgent();
     syncAgentVoices(require('mongoose'));
+    startKynsDataRetention();
 
     const inspectFlags = process.execArgv.some((arg) => arg.startsWith('--inspect'));
     if (inspectFlags || isEnabled(process.env.MEM_DIAG)) {

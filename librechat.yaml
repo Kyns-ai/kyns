@@ -16,6 +16,21 @@ interface:
   runCode: false
   suggestions: true
   customWelcome: "Olá — o que você quer saber hoje?"
+  termsOfService:
+    modalAcceptance: true
+    modalTitle: "Bem-vindo ao KYNS"
+    modalContent:
+      - "## Como o KYNS protege sua privacidade"
+      - ""
+      - "**Conversas temporárias:** todas as mensagens e conversas são automaticamente deletadas do servidor após 24 horas. Nenhum histórico de conversa é retido permanentemente."
+      - ""
+      - "**Memória personalizada:** o KYNS pode aprender suas preferências ao longo do tempo para oferecer respostas melhores. Isso é separado das conversas e pode ser desativado a qualquer momento em **Configurações → Personalização**."
+      - ""
+      - "**Sem compartilhamento de identidade:** suas mensagens são processadas de forma isolada. O provedor de infraestrutura recebe apenas o conteúdo da mensagem — nunca seu e-mail, ID ou qualquer dado de conta."
+      - ""
+      - "**Imagens geradas:** são deletadas automaticamente do servidor após 24 horas."
+      - ""
+      - "Ao continuar, você confirma que tem 18+ anos e concorda com os [Termos de Uso](https://kyns.ai/terms) e a [Política de Privacidade](https://kyns.ai/privacy)."
   marketplace:
     use: true
 rateLimits:

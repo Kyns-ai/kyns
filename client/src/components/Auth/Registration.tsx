@@ -64,7 +64,12 @@ const Registration: React.FC = () => {
     },
   });
 
-  const renderInput = (id: string, label: TranslationKeys, type: string, validation: object) => (
+  const renderInput = (
+    id: string,
+    label: TranslationKeys,
+    type: string,
+    validation: object,
+  ) => (
     <div className="mb-4">
       <div className="relative">
         <input
@@ -73,7 +78,7 @@ const Registration: React.FC = () => {
           autoComplete={id}
           aria-label={localize(label)}
           {...register(
-            id as 'name' | 'email' | 'username' | 'password' | 'confirm_password',
+            id as 'name' | 'email' | 'username' | 'password' | 'confirm_password' | 'termsAccepted',
             validation,
           )}
           aria-invalid={!!errors[id]}
@@ -124,7 +129,7 @@ const Registration: React.FC = () => {
             aria-label="Registration form"
             method="POST"
             onSubmit={handleSubmit((data: TRegisterUser) =>
-              registerUser.mutate({ ...data, token: token ?? undefined }),
+              registerUser.mutate({ ...data, token: token ?? undefined, termsAccepted: true }),
             )}
           >
             {renderInput('name', 'com_auth_full_name', 'text', {
@@ -178,6 +183,44 @@ const Registration: React.FC = () => {
               validate: (value: string) =>
                 value === password || localize('com_auth_password_not_match'),
             })}
+
+            <div className="mb-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  id="termsAccepted"
+                  type="checkbox"
+                  {...register('termsAccepted', {
+                    required: localize('com_auth_must_accept_terms'),
+                  })}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border-light accent-green-500"
+                />
+                <span className="text-sm text-text-secondary">
+                  {localize('com_auth_terms_agree')}{' '}
+                  <a
+                    href="https://kyns.ai/terms"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-green-600 hover:underline dark:text-green-400"
+                  >
+                    {localize('com_auth_terms_link')}
+                  </a>
+                  {' & '}
+                  <a
+                    href="https://kyns.ai/privacy"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-green-600 hover:underline dark:text-green-400"
+                  >
+                    {localize('com_auth_privacy_link')}
+                  </a>
+                </span>
+              </label>
+              {errors.termsAccepted && (
+                <span role="alert" className="mt-1 text-sm text-red-500">
+                  {String(errors.termsAccepted.message)}
+                </span>
+              )}
+            </div>
 
             {startupConfig?.turnstile?.siteKey && (
               <div className="my-4 flex justify-center">

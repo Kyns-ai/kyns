@@ -409,6 +409,7 @@ export type TRegisterUser = {
   password: string;
   confirm_password?: string;
   token?: string;
+  termsAccepted?: boolean;
 };
 
 export type TLoginUser = {
