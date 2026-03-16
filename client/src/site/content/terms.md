@@ -208,10 +208,6 @@ Se você acredita que seus direitos autorais foram violados, envie notificação
 
 ## 20. Contato
 
-- Consultas gerais: `legal@kyns.ai`
-- Questões de segurança: `security@kyns.ai`
-- Denúncias de abuso: `abuse@kyns.ai`
-- Segurança de menores: `safety@kyns.ai`
-- Reclamações de copyright: `dmca@kyns.ai`
+Para todas as questões — suporte geral, copyright, privacidade, denúncias de abuso, segurança de menores ou comunicações jurídicas — utilize o canal único: `contact@kyns.ai`.
 
 **KYNS LLC** — Registrada no Estado de Delaware, Estados Unidos.

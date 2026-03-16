@@ -111,13 +111,13 @@ Dependendo da sua localização, você pode ter certos direitos legais em relaç
 - Opor-se a como processamos suas informações pessoais;
 - Registrar reclamação junto à sua autoridade local de proteção de dados.
 
-Para exercer qualquer desses direitos, envie sua solicitação para `privacy@kyns.ai`.
+Para exercer qualquer desses direitos, envie sua solicitação para `contact@kyns.ai`.
 
 **Nota:** o conteúdo de conversas com mais de 24 horas não pode ser acessado, corrigido ou deletado porque já foi permanentemente removido dos nossos sistemas. Memórias personalizadas podem ser visualizadas, editadas e deletadas pelo usuário a qualquer momento pela interface da plataforma.
 
 ## 8. Crianças
 
-A plataforma é restrita a usuários com 18 anos ou mais. Não coletamos intencionalmente informações pessoais de menores de 18 anos. Se tomarmos conhecimento de que um usuário tem menos de 18 anos, encerraremos imediatamente a conta e deletaremos todos os dados associados. Entre em contato com `safety@kyns.ai` para reportar um menor usando a plataforma.
+A plataforma é restrita a usuários com 18 anos ou mais. Não coletamos intencionalmente informações pessoais de menores de 18 anos. Se tomarmos conhecimento de que um usuário tem menos de 18 anos, encerraremos imediatamente a conta e deletaremos todos os dados associados. Entre em contato com `contact@kyns.ai` para reportar um menor usando a plataforma.
 
 ## 9. Segurança e retenção
 
@@ -147,7 +147,6 @@ Podemos atualizar esta Política de Privacidade periodicamente. Alterações mat
 
 ## 12. Contato
 
-- Questões de privacidade: `privacy@kyns.ai`
-- Segurança de menores: `safety@kyns.ai`
+Para questões de privacidade, solicitações de dados ou segurança de menores: `contact@kyns.ai`.
 
 **KYNS LLC** — Registrada no Estado de Delaware, Estados Unidos.

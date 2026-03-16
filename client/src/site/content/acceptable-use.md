@@ -90,9 +90,9 @@ Para transparência:
 
 ## 6. Reportar violações
 
-Reporte violações para `abuse@kyns.ai`. Devido à nossa política de retenção de dados (conversas são deletadas após 24 horas), pode não ser possível acessar conteúdo de conversas passadas. Relatórios devem incluir uma descrição da violação, qualquer evidência disponível e a data e hora aproximadas.
+Reporte violações para `contact@kyns.ai`. Devido à nossa política de retenção de dados (conversas são deletadas após 24 horas), pode não ser possível acessar conteúdo de conversas passadas. Relatórios devem incluir uma descrição da violação, qualquer evidência disponível e a data e hora aproximadas.
 
-Para preocupações envolvendo menores, contate `safety@kyns.ai`. Tratamos relatórios relacionados a menores com a mais alta prioridade.
+Para preocupações envolvendo menores, contate `contact@kyns.ai`. Tratamos relatórios relacionados a menores com a mais alta prioridade.
 
 ## 7. Aplicação
 
@@ -105,7 +105,6 @@ Reservamo-nos o direito de escalar a aplicação a nosso exclusivo critério.
 
 ## 8. Contato
 
-- Denúncias de abuso: `abuse@kyns.ai`
-- Segurança de menores: `safety@kyns.ai`
+Para denúncias de abuso, segurança de menores ou qualquer violação desta Política: `contact@kyns.ai`.
 
 **KYNS LLC** — Registrada no Estado de Delaware, Estados Unidos.
