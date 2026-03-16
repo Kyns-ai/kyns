@@ -171,7 +171,7 @@ const sendVerificationEmail = async (user) => {
     email: user.email,
     token: hash,
     createdAt: Date.now(),
-    expiresIn: 900,
+    expiresIn: 86400,
   });
 
   logger.info(`[sendVerificationEmail] Verification link issued. [Email: ${user.email}]`);
@@ -633,10 +633,10 @@ const resendVerificationEmail = async (req) => {
       email: user.email,
       token: hash,
       createdAt: Date.now(),
-      expiresIn: 900,
+      expiresIn: 86400,
     });
 
-    logger.info(`[resendVerificationEmail] Verification link issued. [Email: ${user.email}]`);
+  logger.info(`[resendVerificationEmail] Verification link issued. [Email: ${user.email}]`);
 
     return {
       status: 200,

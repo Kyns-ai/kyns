@@ -61,12 +61,80 @@ const { loadAgent } = require('~/models/Agent');
 const { getMCPManager } = require('~/config');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { prependKynsMasterPrompt, KynsResponseFilteredError } = require('~/server/services/safety/kynsPlatform');
+const {
+  ensureKynsTrace,
+  logKynsTrace,
+  summarizeText,
+  summarizeError,
+  snapshotKynsTrace,
+  summarizeMessages,
+  summarizeContentParts,
+} = require('~/server/utils/kynsTrace');
 const db = require('~/models');
 
 const DEFAULT_AGENT_RECURSION_LIMIT = 16;
 const MEMORY_CONTEXT_TIMEOUT_MS = 8000;
 const SLOW_STAGE_THRESHOLD_MS = 200;
 const MANUAL_WEB_SEARCH_TOOL_ID = 'manual-web-search';
+
+/**
+ * @param {BaseMessage} message
+ * @returns {string}
+ */
+function extractTextFromGraphMessage(message) {
+  if (!message || typeof message !== 'object') {
+    return '';
+  }
+  const content = message.content;
+  if (typeof content === 'string') {
+    return content.trim();
+  }
+  if (!Array.isArray(content)) {
+    return '';
+  }
+  const parts = [];
+  for (const part of content) {
+    const t = part?.text ?? part?.value;
+    if (typeof t === 'string' && t.trim()) {
+      parts.push(t.trim());
+    }
+  }
+  return parts.join('\n');
+}
+
+/**
+ * @param {Object} run
+ * @returns {string | null}
+ */
+function tryRecoverContentFromGraph(run) {
+  const graph = run?.Graph;
+  if (!graph) {
+    return null;
+  }
+  try {
+    const state = typeof graph.getState === 'function' ? graph.getState() : graph.state;
+    if (!state) {
+      return null;
+    }
+    const messages = state?.values?.messages ?? state?.messages ?? state?.channelValues?.messages;
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return null;
+    }
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const role = msg?.role ?? msg?._getType?.() ?? '';
+      if (role === 'ai' || role === 'assistant') {
+        const text = extractTextFromGraphMessage(msg);
+        if (text.length > 0) {
+          return text;
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 function sanitizePayload(payload) {
   if (!Array.isArray(payload)) {
@@ -176,6 +244,17 @@ function appendTextToMessageContent(content, text) {
   return text;
 }
 
+function hasVisibleTextContentParts(contentParts) {
+  if (!Array.isArray(contentParts)) {
+    return false;
+  }
+
+  return contentParts.some((part) => {
+    const text = typeof part?.text === 'string' ? part.text : '';
+    return text.trim().length > 0;
+  });
+}
+
 class AgentClient extends BaseClient {
   constructor(options = {}) {
     super(null, options);
@@ -232,6 +311,10 @@ class AgentClient extends BaseClient {
    * @returns {MessageContentComplex[]} */
   getContentParts() {
     return this.contentParts;
+  }
+
+  getTrace() {
+    return ensureKynsTrace(this.options.req);
   }
 
   setOptions(_options) {}
@@ -301,6 +384,7 @@ class AgentClient extends BaseClient {
   }
 
   async buildMessages(messages, parentMessageId, _buildOptions, opts) {
+    const trace = this.getTrace();
     if (this.isKynsImageEndpoint()) {
       const orderedMessages = this.constructor.getMessagesForConversation({
         messages,
@@ -330,6 +414,11 @@ class AgentClient extends BaseClient {
       summary: this.shouldSummarize,
       mapMethod: createMultiAgentMapper(this.options.agent, this.agentConfigs),
       mapCondition: (message) => message.addedConvo === true,
+    });
+    logKynsTrace(trace, 'client.buildMessages.start', {
+      orderedMessages: summarizeMessages(orderedMessages),
+      parentMessageId,
+      attachmentCount: Array.isArray(this.options.attachments) ? this.options.attachments.length : 0,
     });
 
     let payload;
@@ -441,10 +530,14 @@ class AgentClient extends BaseClient {
      * This includes: file context (latest message), augmented prompt (RAG), memory context.
      */
     const sharedRunContextParts = [];
+    let latestFileContextChars = 0;
+    let augmentedPromptChars = 0;
+    let memoryContextChars = 0;
 
     /** File context from the latest message (attachments) */
     const latestMessage = orderedMessages[orderedMessages.length - 1];
     if (latestMessage?.fileContext) {
+      latestFileContextChars = latestMessage.fileContext.length;
       sharedRunContextParts.push(latestMessage.fileContext);
     }
 
@@ -454,6 +547,7 @@ class AgentClient extends BaseClient {
       this.augmentedPrompt = await this.contextHandlers.createContext();
       this.logSlowStage('createContext', contextStart);
       if (this.augmentedPrompt) {
+        augmentedPromptChars = this.augmentedPrompt.length;
         sharedRunContextParts.push(this.augmentedPrompt);
       }
     }
@@ -463,6 +557,7 @@ class AgentClient extends BaseClient {
     const withoutKeys = await this.awaitMemoryContextWithTimeout(this.useMemory());
     this.logSlowStage('loadMemoryContext', memoryStart);
     if (withoutKeys) {
+      memoryContextChars = withoutKeys.length;
       const memoryContext = `${memoryInstructions}\n\n# Existing memory about the user:\n${withoutKeys}`;
       sharedRunContextParts.push(memoryContext);
     }
@@ -495,6 +590,14 @@ class AgentClient extends BaseClient {
     if (promptTokens >= 0 && typeof opts?.getReqData === 'function') {
       opts.getReqData({ promptTokens });
     }
+    logKynsTrace(trace, 'client.buildMessages.ready', {
+      latestFileContextChars,
+      augmentedPromptChars,
+      memoryContextChars,
+      sharedRunContextChars: sharedRunContext.length,
+      promptTokens,
+      resultMessages: summarizeMessages(messages),
+    });
 
     /**
      * Apply context to all agents.
@@ -559,11 +662,15 @@ class AgentClient extends BaseClient {
     if (!memoryPromise) {
       return;
     }
+    const trace = this.getTrace();
 
     let timeoutId;
     const timeoutPromise = new Promise((resolve) => {
       timeoutId = setTimeout(() => {
         logger.warn(`[AgentClient] Memory context timed out after ${timeoutMs}ms`);
+        logKynsTrace(trace, 'client.memoryContext.timeout', {
+          timeoutMs,
+        });
         resolve(undefined);
       }, timeoutMs);
     });
@@ -571,11 +678,19 @@ class AgentClient extends BaseClient {
     const guardedPromise = Promise.resolve(memoryPromise)
       .then((value) => {
         clearTimeout(timeoutId);
+        logKynsTrace(trace, 'client.memoryContext.resolved', {
+          timeoutMs,
+          memoryContext: summarizeText(value),
+        });
         return value;
       })
       .catch((error) => {
         clearTimeout(timeoutId);
         logger.error('[AgentClient] Error loading memory context:', error);
+        logKynsTrace(trace, 'client.memoryContext.error', {
+          timeoutMs,
+          error: summarizeError(error),
+        });
         return;
       });
 
@@ -650,8 +765,12 @@ class AgentClient extends BaseClient {
    * @returns {Promise<string | undefined>}
    */
   async useMemory() {
+    const trace = this.getTrace();
     const user = this.options.req.user;
     if (user.personalization?.memories === false) {
+      logKynsTrace(trace, 'client.useMemory.skip', {
+        reason: 'personalization_disabled',
+      });
       return;
     }
     const hasAccess = await checkAccess({
@@ -665,11 +784,17 @@ class AgentClient extends BaseClient {
       logger.debug(
         `[api/server/controllers/agents/client.js #useMemory] User ${user.id} does not have USE permission for memories`,
       );
+      logKynsTrace(trace, 'client.useMemory.skip', {
+        reason: 'permission_denied',
+      });
       return;
     }
     const appConfig = this.options.req.config;
     const memoryConfig = appConfig.memory;
     if (!memoryConfig || memoryConfig.disabled === true) {
+      logKynsTrace(trace, 'client.useMemory.skip', {
+        reason: 'memory_config_disabled',
+      });
       return;
     }
 
@@ -702,6 +827,9 @@ class AgentClient extends BaseClient {
     }
 
     if (!prelimAgent) {
+      logKynsTrace(trace, 'client.useMemory.skip', {
+        reason: 'no_prelim_agent',
+      });
       return;
     }
 
@@ -733,6 +861,9 @@ class AgentClient extends BaseClient {
         '[api/server/controllers/agents/client.js #useMemory] No agent found for memory',
         memoryConfig,
       );
+      logKynsTrace(trace, 'client.useMemory.skip', {
+        reason: 'memory_agent_not_found',
+      });
       return;
     }
 
@@ -774,6 +905,12 @@ class AgentClient extends BaseClient {
     });
 
     this.processMemory = processMemory;
+    logKynsTrace(trace, 'client.useMemory.ready', {
+      memoryAgentId: agent.id,
+      memoryAgentProvider: agent.provider,
+      memoryAgentModel: agent.model ?? agent.model_parameters?.model,
+      memoryContext: summarizeText(withoutKeys),
+    });
     return withoutKeys;
   }
 
@@ -1112,7 +1249,11 @@ class AgentClient extends BaseClient {
 
   /** @type {sendCompletion} */
   async sendCompletion(payload, opts = {}) {
+    const trace = this.getTrace();
     if (this.shouldBypassToKynsImage()) {
+      logKynsTrace(trace, 'client.sendCompletion.kynsImageBypass', {
+        requestedModel: this.getKynsImageRequestedModel(),
+      });
       logger.info('[KYNSImage] Bypass activated — skipping agent pipeline');
       try {
         const imageContent = await this.executeKynsImageRequest();
@@ -1125,9 +1266,15 @@ class AgentClient extends BaseClient {
         });
       }
       const completion = filterMalformedContentParts(this.contentParts);
+      logKynsTrace(trace, 'client.sendCompletion.kynsImageDone', {
+        completion: summarizeContentParts(completion),
+      });
       return { completion };
     }
 
+    logKynsTrace(trace, 'client.sendCompletion.agentStart', {
+      payloadCount: Array.isArray(payload) ? payload.length : undefined,
+    });
     await this.chatCompletion({
       payload,
       onProgress: opts.onProgress,
@@ -1136,6 +1283,10 @@ class AgentClient extends BaseClient {
     });
 
     const completion = filterMalformedContentParts(this.contentParts);
+    logKynsTrace(trace, 'client.sendCompletion.agentDone', {
+      completion: summarizeContentParts(completion),
+      traceSnapshot: snapshotKynsTrace(trace),
+    });
     return { completion };
   }
 
@@ -1234,6 +1385,7 @@ class AgentClient extends BaseClient {
    * @param {AbortController} [params.abortController]
    */
   async chatCompletion({ payload, userMCPAuthMap, abortController = null }) {
+    const trace = this.getTrace();
     /** @type {Partial<GraphRunnableConfig>} */
     let config;
     /** @type {ReturnType<createRun>} */
@@ -1251,7 +1403,7 @@ class AgentClient extends BaseClient {
       /** @type {AppConfig['endpoints']['agents']} */
       const agentsEConfig = appConfig.endpoints?.[EModelEndpoint.agents];
 
-      config = {
+      const createRunConfig = () => ({
         runName: 'AgentRun',
         configurable: {
           thread_id: this.conversationId,
@@ -1269,7 +1421,9 @@ class AgentClient extends BaseClient {
         signal: abortController.signal,
         streamMode: 'values',
         version: 'v2',
-      };
+      });
+
+      config = createRunConfig();
 
       payload = await this.prepareManualWebSearch(payload);
       payload = sanitizePayload(payload);
@@ -1287,11 +1441,16 @@ class AgentClient extends BaseClient {
           fallbackText: this.options.req?.body?.text,
         },
       ));
+      logKynsTrace(trace, 'client.chatCompletion.initialMessages', {
+        payloadCount: Array.isArray(payload) ? payload.length : undefined,
+        initialMessages: summarizeMessages(initialMessages),
+      });
 
       /**
        * @param {BaseMessage[]} messages
        */
       const runAgents = async (messages) => {
+        config = createRunConfig();
         const agents = [this.options.agent];
         // Include additional agents when:
         // - agentConfigs has agents (from addedConvo parallel execution or agent handoffs)
@@ -1339,6 +1498,11 @@ class AgentClient extends BaseClient {
         // }
 
         memoryPromise = this.runMemory(messages);
+        logKynsTrace(trace, 'client.runAgents.beforeCreateRun', {
+          messageSummary: summarizeMessages(messages),
+          agentCount: agents.length,
+          recursionLimit: config.recursionLimit,
+        });
 
         const createRunStart = Date.now();
         run = await createRun({
@@ -1353,6 +1517,10 @@ class AgentClient extends BaseClient {
           tokenCounter: createTokenCounter(this.getEncoding()),
         });
         this.logSlowStage('createRun', createRunStart);
+        logKynsTrace(trace, 'client.runAgents.afterCreateRun', {
+          hasRun: Boolean(run),
+          recursionLimit: config.recursionLimit,
+        });
 
         if (!run) {
           throw new Error('Failed to create run');
@@ -1371,10 +1539,18 @@ class AgentClient extends BaseClient {
 
         /** @deprecated Agent Chain */
         config.configurable.last_agent_id = agents[agents.length - 1].id;
+        logKynsTrace(trace, 'client.runAgents.beforeProcessStream', {
+          lastAgentId: config.configurable.last_agent_id,
+          hideSequentialOutputs: config.configurable.hide_sequential_outputs,
+        });
         await run.processStream({ messages }, config, {
           callbacks: {
             [Callback.TOOL_ERROR]: logToolError,
           },
+        });
+        logKynsTrace(trace, 'client.runAgents.afterProcessStream', {
+          contentParts: summarizeContentParts(this.contentParts),
+          traceSnapshot: snapshotKynsTrace(trace),
         });
 
         config.signal = null;
@@ -1386,14 +1562,19 @@ class AgentClient extends BaseClient {
         await runAgents(initialMessages);
       } catch (retryErr) {
         const isTransient =
-          /Connection error|terminated|ECONNREFUSED|ECONNRESET|fetch failed|ETIMEDOUT|EngineCore/i.test(
+          /Connection error|terminated|ECONNREFUSED|ECONNRESET|fetch failed|ETIMEDOUT|EngineCore|Received empty response|Empty streamed response/i.test(
             retryErr?.message ?? '',
           );
-        if (isTransient && this.contentParts.length === 0) {
+        if (isTransient && !hasVisibleTextContentParts(this.contentParts)) {
           const jitter = 2000 + Math.floor(Math.random() * 1000);
+          logKynsTrace(trace, 'client.chatCompletion.transientRetry', {
+            jitter,
+            error: summarizeError(retryErr),
+          });
           logger.warn(
             `[AgentClient] Transient error before content, retrying once in ${jitter}ms: ${retryErr?.message}`,
           );
+          this.contentParts = [];
           await new Promise((resolve) => setTimeout(resolve, jitter));
           await runAgents(initialMessages);
         } else {
@@ -1401,13 +1582,28 @@ class AgentClient extends BaseClient {
         }
       }
 
-      if (this.contentParts.length === 0) {
-        const jitter = 1500 + Math.floor(Math.random() * 500);
-        logger.warn(
-          `[AgentClient] Empty contentParts after successful processStream, retrying once in ${jitter}ms`,
-        );
-        await new Promise((resolve) => setTimeout(resolve, jitter));
-        await runAgents(initialMessages);
+      if (!hasVisibleTextContentParts(this.contentParts)) {
+        const recoveredText = tryRecoverContentFromGraph(run);
+        if (recoveredText) {
+          logKynsTrace(trace, 'client.chatCompletion.emptyRecovered', {
+            recoveredLength: recoveredText.length,
+          });
+          logger.info('[AgentClient] Recovered content from graph state after empty contentParts');
+          this.contentParts = [];
+          this.contentParts.push({ type: ContentTypes.TEXT, text: recoveredText });
+        } else {
+          const jitter = 1500 + Math.floor(Math.random() * 500);
+          logKynsTrace(trace, 'client.chatCompletion.emptyRetry', {
+            jitter,
+            traceSnapshot: snapshotKynsTrace(trace),
+          });
+          logger.warn(
+            `[AgentClient] Empty contentParts after successful processStream, retrying once in ${jitter}ms`,
+          );
+          this.contentParts = [];
+          await new Promise((resolve) => setTimeout(resolve, jitter));
+          await runAgents(initialMessages);
+        }
       }
 
       /** @deprecated Agent Chain */
@@ -1426,13 +1622,21 @@ class AgentClient extends BaseClient {
       }
     } catch (err) {
       if (err instanceof KynsResponseFilteredError) {
-        logger.warn('[AgentClient] Response blocked by KYNS safety filter', {
+        logKynsTrace(trace, 'client.chatCompletion.filtered', {
+          reason: err.reason,
+          traceSnapshot: snapshotKynsTrace(trace),
+        });
+        logger.warn('[AgentClient] Response interrupted by KYNS response guard', {
           reason: err.reason,
           userId: this.user ?? this.options.req.user?.id,
           conversationId: this.conversationId,
           messageId: this.responseMessageId,
         });
       } else {
+        logKynsTrace(trace, 'client.chatCompletion.error', {
+          error: summarizeError(err),
+          traceSnapshot: snapshotKynsTrace(trace),
+        });
         logger.error(
           '[api/server/controllers/agents/client.js #sendCompletion] Operation aborted',
           err,
@@ -1451,7 +1655,7 @@ class AgentClient extends BaseClient {
           ? '\n' + err.stack.split('\n').slice(0, 4).join('\n')
           : '';
         const isConnectionError =
-          /Connection error|terminated|ECONNREFUSED|ECONNRESET|fetch failed|ETIMEDOUT|EngineCore/i.test(rawMsg);
+          /Connection error|terminated|ECONNREFUSED|ECONNRESET|fetch failed|ETIMEDOUT|EngineCore|Received empty response|Empty streamed response/i.test(rawMsg);
         const userMessage = isConnectionError
           ? 'Falha de conexão com o servidor. Pode ser temporário — tente novamente em alguns instantes.'
           : `${rawMsg || 'Unknown error'}${stackHint}`;
@@ -1461,6 +1665,10 @@ class AgentClient extends BaseClient {
         });
       }
     } finally {
+      logKynsTrace(trace, 'client.chatCompletion.finally', {
+        contentParts: summarizeContentParts(this.contentParts),
+        traceSnapshot: snapshotKynsTrace(trace),
+      });
       try {
         if (memoryPromise) {
           memoryPromise

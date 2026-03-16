@@ -11,6 +11,12 @@ const azureAssistants = require('~/server/services/Endpoints/azureAssistants');
 const assistants = require('~/server/services/Endpoints/assistants');
 const { getEndpointsConfig } = require('~/server/services/Config');
 const agents = require('~/server/services/Endpoints/agents');
+const {
+  ensureKynsTrace,
+  logKynsTrace,
+  summarizeParsedBody,
+  summarizeEndpointOption,
+} = require('~/server/utils/kynsTrace');
 const { updateFilesUsage } = require('~/models');
 
 const buildFunction = {
@@ -35,11 +41,11 @@ const applySpecOverrides = (parsedBody) => {
       parsedBody.reasoning_effort == null || parsedBody.reasoning_effort === ''
         ? 'high'
         : parsedBody.reasoning_effort,
-    max_tokens: 4096,
-    repetition_penalty: 1.3,
+    max_tokens:
+      parsedBody.max_tokens == null || parsedBody.max_tokens === '' ? 2048 : parsedBody.max_tokens,
     chat_template_kwargs: {
       ...(parsedBody.chat_template_kwargs ?? {}),
-      enable_thinking: true,
+      enable_thinking: false,
     },
   };
 };
@@ -47,6 +53,12 @@ const applySpecOverrides = (parsedBody) => {
 async function buildEndpointOption(req, res, next) {
   const { endpoint: requestedEndpoint, endpointType } = req.body;
   const endpoint = getEffectiveEndpoint(requestedEndpoint, req.body?.spec);
+  const trace = ensureKynsTrace(req, {
+    userId: req.user?.id,
+    requestedEndpoint,
+    requestedSpec: req.body?.spec,
+    conversationId: req.body?.conversationId,
+  });
 
   let endpointsConfig;
   try {
@@ -124,6 +136,11 @@ async function buildEndpointOption(req, res, next) {
   }
 
   parsedBody = applySpecOverrides(parsedBody);
+  logKynsTrace(trace, 'buildEndpointOption.parsedBody', {
+    endpoint,
+    endpointType,
+    parsedBody: summarizeParsedBody(parsedBody),
+  });
 
   try {
     const isAgents = isAgentEndpoint || isAgentRoute;
@@ -141,6 +158,10 @@ async function buildEndpointOption(req, res, next) {
       req.body.modelLabel = parsedBody.modelLabel;
     }
     req.body.endpointOption = await builder(endpoint, parsedBody, endpointType);
+    logKynsTrace(trace, 'buildEndpointOption.endpointOption', {
+      isAgents,
+      endpointOption: summarizeEndpointOption(req.body.endpointOption),
+    });
 
     if (req.body.files && !isAgents) {
       req.body.endpointOption.attachments = updateFilesUsage(req.body.files);

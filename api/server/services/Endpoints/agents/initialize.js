@@ -20,14 +20,22 @@ const {
   getDefaultHandlers,
 } = require('~/server/controllers/agents/callbacks');
 const { createKynsResponseGuard } = require('~/server/services/safety/kynsPlatform');
+const patchEmptyAgentStreams = require('./patchEmptyAgentStreams');
 const { loadAgentTools, loadToolsForExecution } = require('~/server/services/ToolService');
 const { getModelsConfig } = require('~/server/controllers/ModelController');
 const AgentClient = require('~/server/controllers/agents/client');
+const {
+  ensureKynsTrace,
+  logKynsTrace,
+  summarizeEndpointOption,
+} = require('~/server/utils/kynsTrace');
 const { getConvoFiles } = require('~/models/Conversation');
 const { processAddedConvo } = require('./addedConvo');
 const { getAgent } = require('~/models/Agent');
 const { logViolation } = require('~/cache');
 const db = require('~/models');
+
+patchEmptyAgentStreams();
 
 /**
  * Creates a tool loader function for the agent.
@@ -85,7 +93,11 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
   if (!endpointOption) {
     throw new Error('Endpoint option not provided');
   }
+  const trace = ensureKynsTrace(req);
   const appConfig = req.config;
+  logKynsTrace(trace, 'initializeClient.start', {
+    endpointOption: summarizeEndpointOption(endpointOption),
+  });
 
   /** @type {string | null} */
   const streamId = req._resumableStreamId || null;
@@ -143,6 +155,7 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     toolEndCallback,
     collectedUsage,
     streamId,
+    traceContext: req,
   });
 
   if (!endpointOption.agent) {
@@ -416,6 +429,13 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     resendFiles: primaryConfig.resendFiles ?? true,
     maxContextTokens: primaryConfig.maxContextTokens,
     endpoint: isEphemeralAgentId(primaryConfig.id) ? primaryConfig.endpoint : EModelEndpoint.agents,
+  });
+  logKynsTrace(trace, 'initializeClient.ready', {
+    primaryAgentId: primaryConfig.id,
+    primaryAgentProvider: primaryConfig.provider,
+    primaryAgentModel: primaryConfig.model_parameters?.model ?? primaryConfig.model,
+    additionalAgentCount: agentConfigs.size,
+    streamId,
   });
 
   if (streamId) {

@@ -12,6 +12,12 @@ const { processFileCitations } = require('~/server/services/Files/Citations');
 const { processCodeOutput } = require('~/server/services/Files/Code/process');
 const { loadAuthValues } = require('~/server/services/Tools/credentials');
 const { saveBase64Image } = require('~/server/services/Files/process');
+const {
+  getKynsTrace,
+  logKynsTrace,
+  summarizeText,
+  incrementKynsTraceCounter,
+} = require('~/server/utils/kynsTrace');
 
 class ModelEndHandler {
   /**
@@ -108,6 +114,23 @@ async function emitEvent(res, streamId, eventData) {
   }
 }
 
+function extractDeltaText(data) {
+  const content = data?.delta?.content;
+  if (!content) {
+    return '';
+  }
+
+  const parts = Array.isArray(content) ? content : [content];
+  return parts
+    .map((part) => {
+      if (typeof part?.text === 'string') {
+        return part.text;
+      }
+      return typeof part?.text?.value === 'string' ? part.text.value : '';
+    })
+    .join('');
+}
+
 /**
  * @typedef {Object} ToolExecuteOptions
  * @property {(toolNames: string[]) => Promise<{loadedTools: StructuredTool[]}>} loadTools - Function to load tools by name
@@ -135,12 +158,14 @@ function getDefaultHandlers({
   collectedUsage,
   streamId = null,
   toolExecuteOptions = null,
+  traceContext = null,
 }) {
   if (!res || !aggregateContent) {
     throw new Error(
       `[getDefaultHandlers] Missing required options: res: ${!res}, aggregateContent: ${!aggregateContent}`,
     );
   }
+  const trace = getKynsTrace(traceContext);
   const emitGuardEvents = async (guardResult, fallbackEvent) => {
     if (guardResult?.error) {
       throw guardResult.error;
@@ -167,6 +192,15 @@ function getDefaultHandlers({
        * @param {GraphRunnableConfig['configurable']} [metadata] The runnable metadata.
        */
       handle: async (event, data, metadata) => {
+        const count = incrementKynsTraceCounter(trace, 'runStep');
+        if (count <= 3) {
+          logKynsTrace(trace, 'callbacks.onRunStep', {
+            event,
+            count,
+            stepType: data?.stepDetails?.type,
+            node: metadata?.langgraph_node,
+          });
+        }
         aggregateContent({ event, data });
         if (data?.stepDetails.type === StepTypes.TOOL_CALLS) {
           await emitEvent(res, streamId, { event, data });
@@ -196,6 +230,15 @@ function getDefaultHandlers({
        * @param {GraphRunnableConfig['configurable']} [metadata] The runnable metadata.
        */
       handle: async (event, data, metadata) => {
+        const count = incrementKynsTraceCounter(trace, 'runStepDelta');
+        if (count <= 3) {
+          logKynsTrace(trace, 'callbacks.onRunStepDelta', {
+            event,
+            count,
+            stepType: data?.delta?.type,
+            node: metadata?.langgraph_node,
+          });
+        }
         aggregateContent({ event, data });
         if (data?.delta.type === StepTypes.TOOL_CALLS) {
           await emitEvent(res, streamId, { event, data });
@@ -214,6 +257,15 @@ function getDefaultHandlers({
        * @param {GraphRunnableConfig['configurable']} [metadata] The runnable metadata.
        */
       handle: async (event, data, metadata) => {
+        const count = incrementKynsTraceCounter(trace, 'runStepCompleted');
+        if (count <= 3) {
+          logKynsTrace(trace, 'callbacks.onRunStepCompleted', {
+            event,
+            count,
+            hasResult: data?.result != null,
+            node: metadata?.langgraph_node,
+          });
+        }
         aggregateContent({ event, data });
         if (data?.result != null) {
           await emitEvent(res, streamId, { event, data });
@@ -233,6 +285,15 @@ function getDefaultHandlers({
        */
       handle: async (event, data, metadata) => {
         const currentEvent = { event, data };
+        const count = incrementKynsTraceCounter(trace, 'messageDelta');
+        if (count <= 3) {
+          logKynsTrace(trace, 'callbacks.onMessageDelta', {
+            event,
+            count,
+            chunk: summarizeText(extractDeltaText(data)),
+            node: metadata?.langgraph_node,
+          });
+        }
         const guardResult = responseGuard?.handleMessageDelta(currentEvent) ?? null;
         if (guardResult?.aggregate !== false) {
           aggregateContent(currentEvent);
@@ -253,6 +314,15 @@ function getDefaultHandlers({
        */
       handle: async (event, data, metadata) => {
         const currentEvent = { event, data };
+        const count = incrementKynsTraceCounter(trace, 'reasoningDelta');
+        if (count <= 3) {
+          logKynsTrace(trace, 'callbacks.onReasoningDelta', {
+            event,
+            count,
+            chunk: summarizeText(extractDeltaText(data)),
+            node: metadata?.langgraph_node,
+          });
+        }
         const guardResult = responseGuard?.handleReasoningDelta(currentEvent) ?? null;
         if (guardResult?.aggregate !== false) {
           aggregateContent(currentEvent);

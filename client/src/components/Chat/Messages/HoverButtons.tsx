@@ -1,5 +1,6 @@
 import React, { useState, useMemo, memo } from 'react';
 import { useRecoilState } from 'recoil';
+import { ContentTypes } from 'librechat-data-provider';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
 import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
@@ -126,6 +127,15 @@ const HoverButtons = ({
     isEditableEndpoint,
   } = generationCapabilities;
 
+  const hasErrorContentPart = useMemo(
+    () =>
+      Array.isArray(message.content) &&
+      (message.content as Array<{ type?: string } | undefined>).some(
+        (part) => part?.type === ContentTypes.ERROR,
+      ),
+    [message.content],
+  );
+
   if (!conversation) {
     return null;
   }
@@ -161,7 +171,7 @@ const HoverButtons = ({
     );
   }
 
-  if (error === true) {
+  if (error === true || hasErrorContentPart) {
     return (
       <div className="visible flex justify-center self-end lg:justify-start">
         {regenerateEnabled && (

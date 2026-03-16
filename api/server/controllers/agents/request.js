@@ -17,6 +17,15 @@ const {
   BLOCKED_REQUEST_RESPONSE,
   BLOCKED_USER_PLACEHOLDER,
 } = require('~/server/services/safety/kynsPlatform');
+const {
+  ensureKynsTrace,
+  logKynsTrace,
+  summarizeText,
+  summarizeError,
+  snapshotKynsTrace,
+  summarizeContentParts,
+  summarizeEndpointOption,
+} = require('~/server/utils/kynsTrace');
 const { trackRunpodChatActivity } = require('~/server/services/runpodIdleStop');
 
 function createCloseHandler(abortController) {
@@ -155,8 +164,23 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
   const userId = req.user.id;
   const conversationId =
     !reqConversationId || reqConversationId === 'new' ? crypto.randomUUID() : reqConversationId;
+  const trace = ensureKynsTrace(req, {
+    userId,
+    conversationId,
+    endpoint: endpointOption?.endpoint,
+    spec: endpointOption?.spec,
+  });
+  logKynsTrace(trace, 'request.received', {
+    text: summarizeText(text),
+    isRegenerate,
+    isContinued,
+    endpointOption: summarizeEndpointOption(endpointOption),
+  });
 
   if (req.kynsSafetyBlock?.blocked) {
+    logKynsTrace(trace, 'request.blocked', {
+      reason: req.kynsSafetyBlock.reason,
+    });
     await emitBlockedSafetyResponse({
       req,
       res,
@@ -196,6 +220,10 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     const job = await GenerationJobManager.createJob(streamId, userId, conversationId);
     const jobCreatedAt = job.createdAt; // Capture creation time to detect job replacement
     req._resumableStreamId = streamId;
+    logKynsTrace(trace, 'request.jobCreated', {
+      streamId,
+      jobCreatedAt,
+    });
 
     logger.info(`[ResumableAgentController] Job created streamId=${streamId} (conversationId=${conversationId})`);
 
@@ -274,8 +302,16 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       // Use the job's abort controller signal - allows abort via GenerationJobManager.abortJob()
       signal: job.abortController.signal,
     });
+    logKynsTrace(trace, 'request.initializeClient.done', {
+      streamId,
+      hasClient: Boolean(result?.client),
+      hasUserMCPAuthMap: Boolean(result?.userMCPAuthMap),
+    });
 
     if (job.abortController.signal.aborted) {
+      logKynsTrace(trace, 'request.initialization.aborted', {
+        streamId,
+      });
       GenerationJobManager.completeJob(streamId, 'Request aborted during initialization');
       await decrementPendingRequest(userId);
       releaseRunpodActivity();
@@ -317,6 +353,12 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       try {
         const onStart = (userMsg, respMsgId, _isNewConvo) => {
           userMessage = userMsg;
+          logKynsTrace(trace, 'request.onStart', {
+            streamId,
+            userMessageId: userMsg.messageId,
+            responseMessageId: respMsgId,
+            text: summarizeText(userMsg.text),
+          });
 
           // Store userMessage and responseMessageId upfront for resume capability
           GenerationJobManager.updateMetadata(streamId, {
@@ -359,8 +401,19 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
             },
           },
         };
+        logKynsTrace(trace, 'request.sendMessage.start', {
+          streamId,
+          responseMessageId: editedResponseMessageId,
+        });
 
         const response = await client.sendMessage(text, messageOptions);
+        logKynsTrace(trace, 'request.sendMessage.done', {
+          streamId,
+          responseMessageId: response?.messageId,
+          responseContent: summarizeContentParts(response?.content),
+          clientContentParts: summarizeContentParts(client?.contentParts),
+          traceSnapshot: snapshotKynsTrace(trace),
+        });
 
         const messageId = response.messageId;
         const endpoint = endpointOption.endpoint;
@@ -416,6 +469,12 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         const jobWasReplaced = !currentJob || currentJob.createdAt !== jobCreatedAt;
 
         if (jobWasReplaced) {
+          logKynsTrace(trace, 'request.jobReplaced', {
+            streamId,
+            originalCreatedAt: jobCreatedAt,
+            currentCreatedAt: currentJob?.createdAt,
+            traceSnapshot: snapshotKynsTrace(trace),
+          });
           logger.debug(`[ResumableAgentController] Skipping FINAL emit - job was replaced`, {
             streamId,
             originalCreatedAt: jobCreatedAt,
@@ -434,6 +493,14 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
             requestMessage: sanitizeMessageForTransmit(userMessage),
             responseMessage: { ...response },
           };
+          logKynsTrace(trace, 'request.final.ready', {
+            streamId,
+            responseMessageId: response?.messageId,
+            requestMessageId: userMessage?.messageId,
+            responseContent: summarizeContentParts(response?.content),
+            clientContentParts: summarizeContentParts(client?.contentParts),
+            traceSnapshot: snapshotKynsTrace(trace),
+          });
 
           logger.debug(`[ResumableAgentController] Emitting FINAL event`, {
             streamId,
@@ -454,6 +521,12 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
             requestMessage: sanitizeMessageForTransmit(userMessage),
             responseMessage: { ...response, unfinished: true },
           };
+          logKynsTrace(trace, 'request.final.aborted', {
+            streamId,
+            responseMessageId: response?.messageId,
+            requestMessageId: userMessage?.messageId,
+            traceSnapshot: snapshotKynsTrace(trace),
+          });
 
           logger.debug(`[ResumableAgentController] Emitting ABORTED FINAL event`, {
             streamId,
@@ -492,9 +565,18 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         const wasAborted = job.abortController.signal.aborted || error.message?.includes('abort');
 
         if (wasAborted) {
+          logKynsTrace(trace, 'request.generation.aborted', {
+            streamId,
+            traceSnapshot: snapshotKynsTrace(trace),
+          });
           logger.debug(`[ResumableAgentController] Generation aborted for ${streamId}`);
           // abortJob already handled emitDone and completeJob
         } else {
+          logKynsTrace(trace, 'request.generation.error', {
+            streamId,
+            error: summarizeError(error),
+            traceSnapshot: snapshotKynsTrace(trace),
+          });
           logger.error(`[ResumableAgentController] Generation error for ${streamId}:`, error);
           await GenerationJobManager.emitError(streamId, error.message || 'Generation failed');
           GenerationJobManager.completeJob(streamId, error.message);
@@ -523,6 +605,10 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     });
   } catch (error) {
     releaseRunpodActivity();
+    logKynsTrace(trace, 'request.initialization.error', {
+      error: summarizeError(error),
+      traceSnapshot: snapshotKynsTrace(trace),
+    });
     logger.error('[ResumableAgentController] Initialization error:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: error.message || 'Failed to start generation' });
