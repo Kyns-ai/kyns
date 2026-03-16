@@ -368,7 +368,7 @@ describe('buildEndpointOption - defaultParamsEndpoint parsing', () => {
     expect(req.body.endpointOption.endpoint).toBe('KYNS');
   });
 
-  it('should enable hidden thinking for the kyns-deep spec', async () => {
+  it('should keep hidden thinking disabled for the kyns-deep spec', async () => {
     mockGetEndpointsConfig.mockResolvedValue({
       KYNS: {
         type: EModelEndpoint.custom,
@@ -389,8 +389,9 @@ describe('buildEndpointOption - defaultParamsEndpoint parsing', () => {
     await buildEndpointOption(req, createRes(), jest.fn());
 
     expect(req.body.endpointOption.reasoning_effort).toBe('high');
+    expect(req.body.endpointOption.max_tokens).toBe(2048);
     expect(req.body.endpointOption.chat_template_kwargs).toEqual({
-      enable_thinking: true,
+      enable_thinking: false,
     });
   });
 });

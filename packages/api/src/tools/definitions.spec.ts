@@ -284,6 +284,7 @@ describe('definitions.ts', () => {
         expect(registryEntry?.parameters).toBeDefined();
         expect(registryEntry?.allowed_callers).toContain('direct');
       });
+
     });
 
     describe('MCP tool definitions with server name variants', () => {

@@ -135,7 +135,9 @@ test.describe('KYNS – Smoke Tests', () => {
     await selectEndpoint(page, 'KYNSDeep');
     await sendChatMessage(page, 'Quanto é 2+2? Responda apenas com 4.');
 
-    await expect(page.getByText('4', { exact: true })).toBeVisible({ timeout: 120000 });
+    await expect(page.getByLabel('Message 2').getByText('4', { exact: true })).toBeVisible({
+      timeout: 120000,
+    });
     await expect(page.getByText('Thinking Process', { exact: false })).not.toBeVisible();
     await expect(page.getByText('<think>', { exact: false })).not.toBeVisible();
   });
