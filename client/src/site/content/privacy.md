@@ -1,152 +1,153 @@
 # Política de Privacidade
 
-Vigência: março de 2026
+Última atualização: março de 2026
 
 No KYNS, privacidade não é discurso de marketing. É uma escolha de arquitetura.
 
-Esta Política de Privacidade descreve como coletamos, usamos e divulgamos informações quando você acessa nosso site, plataforma, recursos e serviços relacionados (em conjunto, os "Serviços").
+Esta Política de Privacidade descreve como coletamos, usamos e divulgamos informações quando você acessa nossa plataforma, recursos e serviços relacionados (em conjunto, os "Serviços").
 
-## 1. Informações pessoais que coletamos
+## 1. Arquitetura de privacidade
 
-Podemos coletar informações pessoais quando você cria uma conta ou entra em contato conosco.
+O KYNS foi projetado para minimizar a retenção de dados. Nossa abordagem:
 
-### Informações de conta
+- O conteúdo das conversas (mensagens e respostas da IA) é retido por **até 24 horas** para continuidade de sessão, depois **automaticamente e permanentemente deletado** dos nossos servidores;
+- Imagens geradas são retidas por **até 24 horas** para entrega, depois automaticamente deletadas;
+- Após a janela de 24 horas, o conteúdo das conversas e as imagens **não podem ser recuperados por ninguém**, incluindo o KYNS;
+- Não treinamos modelos de IA com as conversas dos usuários;
+- Não usamos o conteúdo das conversas para analytics, publicidade, perfilamento ou qualquer finalidade secundária;
+- Informações de identificação do usuário (e-mail, ID de usuário, endereço IP) **não são incluídas** nas requisições enviadas à camada de inferência do modelo de IA. O provedor do modelo recebe apenas o conteúdo da conversa e os parâmetros do modelo.
 
-Quando você cria uma conta, podemos coletar:
+## 2. Informações pessoais que coletamos
 
-- endereço de e-mail.
+### 2.1 Informações de conta
 
-### Informações de comunicação
+Quando você cria uma conta, coletamos:
 
-Se você entrar em contato conosco, podemos coletar:
+- Endereço de e-mail (para criação de conta, login e recuperação de senha);
+- Senha em hash (bcrypt — nunca armazenamos senhas em texto simples);
+- Avatar (preferência do usuário);
+- Data de criação da conta e timestamp do último acesso.
 
-- nome;
-- informações de contato;
-- conteúdo da sua mensagem.
+### 2.2 Informações coletadas automaticamente
 
-### Informações técnicas coletadas automaticamente
+- **Log Data:** endereço IP, tipo de navegador, configurações, data e hora das requisições e como você interage com os Serviços. IPs são usados para limitação de taxa e prevenção de abuso;
+- **Usage Data:** recursos utilizados, ações executadas (como criar conversas, fazer login), fuso horário, país, datas e horários de acesso;
+- **Device Information:** nome do dispositivo, sistema operacional, tipo de navegador.
 
-Quando você visita, usa ou interage com os Serviços, podemos receber automaticamente:
+### 2.3 Memórias personalizadas
 
-- **Log Data:** endereço IP, tipo de navegador, configurações do navegador, data e hora do acesso;
-- **Usage Data:** recursos utilizados, ações executadas, fuso horário, país, datas e horários de acesso, user agent, tipo de dispositivo e conexão;
-- **Device Information:** sistema operacional, identificadores do dispositivo e navegador em uso.
+A plataforma inclui um recurso opcional de memória que armazena preferências e contexto personalizados para melhorar a qualidade das respostas. As memórias são:
 
-## 2. O que não coletamos nem armazenamos
+- Retidas indefinidamente até que o usuário as delete ou desative o recurso;
+- Armazenadas nos nossos servidores;
+- Controláveis pelo usuário: você pode desativar o sistema de memória inteiramente em **Configurações → Personalização**, deletar memórias específicas ou deletar todas as memórias a qualquer momento.
 
-### Conversas
+### 2.4 Informações de comunicação
 
-O KYNS **não armazena** prompts, respostas nem histórico de conversa em seus servidores.
+Se você entrar em contato conosco, podemos coletar nome, informações de contato e o conteúdo das mensagens enviadas.
 
-O histórico fica **somente no seu navegador**, usando armazenamento local, como `localStorage` e/ou `IndexedDB`. Se você limpar esses dados, o histórico desaparece de forma permanente.
+### 2.5 O que não coletamos
 
-### Imagens e conteúdo gerado
+- Conteúdo de conversas além da janela de retenção de 24 horas;
+- Perfis comportamentais, gráficos de interesse ou rastreamento entre sessões;
+- Fingerprints de dispositivo além de cabeçalhos HTTP padrão;
+- Números de cartão de crédito ou dados financeiros (processados integralmente pelo Stripe);
+- Dados biométricos de qualquer natureza.
 
-Imagens e outros conteúdos gerados pelo KYNS são processados em memória e entregues ao seu navegador. Não os persistimos em disco ou em banco de dados como regra operacional da plataforma.
+## 3. Como usamos as informações pessoais
 
-### Vinculação entre logs e conteúdo
+- Para fornecer, administrar, manter e analisar os Serviços;
+- Para autenticar seu acesso e manter sua conta;
+- Para enviar comunicações transacionais (redefinição de senha, notificações de segurança);
+- Para prevenir fraude, atividade criminosa ou uso indevido dos Serviços;
+- Para aplicar limitações de taxa e prevenir abuso;
+- Para cumprir obrigações legais;
+- Para melhorar os Serviços usando métricas agregadas e não identificáveis.
 
-O KYNS **não vincula** endereço IP, dados de conta ou logs técnicos ao conteúdo das suas conversas. Logs técnicos e conteúdo gerado são mantidos separados por desenho de sistema.
+Não usamos suas informações para publicidade direcionada, venda a corretores de dados, treinamento de modelos de IA, análise comportamental ou perfilamento.
 
-## 3. Cookies e armazenamento local
+## 4. Processamento pelo modelo de IA
 
-O KYNS não utiliza cookies próprios para armazenar seu histórico de conversa.
+Quando você envia uma mensagem no KYNS:
 
-Em vez disso:
+- Sua entrada é recebida pelo servidor backend da plataforma via conexão criptografada;
+- Informações de identificação (e-mail, ID de usuário, endereço IP) **não são incluídas** na requisição enviada ao servidor do modelo. A requisição contém apenas o conteúdo da conversa e os parâmetros do modelo;
+- Cada requisição é processada em uma sessão de inferência isolada pela IA em infraestrutura de GPU de terceiros;
+- O provedor de infraestrutura processa a requisição sem acesso à identidade do usuário — a requisição se origina do IP do servidor do KYNS, não do IP do usuário;
+- A resposta é transmitida de volta à plataforma e entregue ao seu navegador;
+- A conversa é retida no banco de dados da plataforma por até 24 horas para continuidade de sessão, depois permanentemente deletada.
 
-- usamos armazenamento local do navegador para preferências e histórico local;
-- cookies de terceiros podem existir apenas quando necessários para autenticação;
-- não usamos cookies próprios para publicidade comportamental.
+Os modelos de IA são open-source (atualmente Qwen, desenvolvido pela Alibaba Cloud). O KYNS não desenvolve nem treina os modelos principais. A infraestrutura de GPU é fornecida por um provedor terceirizado.
 
-## 4. Como usamos as informações
+## 5. Cookies
 
-Podemos usar informações pessoais e técnicas para:
+A plataforma KYNS usa cookies mínimos:
 
-- fornecer, operar, manter e proteger os Serviços;
-- autenticar usuários e administrar contas;
-- responder a comunicações e solicitações de suporte;
-- detectar fraude, abuso, atividade ilegal ou uso indevido dos Serviços;
-- analisar falhas, desempenho e estabilidade;
-- cumprir obrigações legais;
-- apoiar reorganizações societárias, investimentos, fusões, aquisições ou transferências de ativos.
+- Cookie de autenticação de sessão (token JWT) — estritamente necessário;
+- Token de proteção CSRF — estritamente necessário.
 
-## 5. Pagamentos
-
-Se você assinar um plano pago, pagamentos podem ser processados por terceiros, como Stripe.
-
-O KYNS não armazena números completos de cartão de crédito. As informações de faturamento necessárias são tratadas pelo provedor de pagamento segundo os termos e políticas dele.
+Não usamos cookies de analytics, cookies de publicidade, pixels de rastreamento, widgets de redes sociais ou cookies de terceiros.
 
 ## 6. Compartilhamento e divulgação
 
-Podemos divulgar informações pessoais nas seguintes hipóteses:
+Podemos compartilhar informações pessoais apenas nas seguintes circunstâncias:
 
-### Prestadores de serviço
+- **Fornecedores e prestadores de serviço:** hospedagem, nuvem, e-mail, pagamento e outros provedores que processam informações conforme nossas instruções. Esses provedores nunca recebem conteúdo de conversa além do necessário para operação do serviço;
+- **Transferências de negócio:** se o KYNS estiver envolvido em uma transação estratégica, reorganização ou transferência de serviço, informações pessoais podem ser transferidas como parte da operação;
+- **Exigências legais:** podemos compartilhar informações com autoridades governamentais se exigido por lei, para proteger nossos direitos ou propriedade, para tratar violações dos nossos termos, para proteger a segurança ou para proteger contra responsabilidade legal.
 
-Podemos compartilhar dados com fornecedores que nos ajudam a operar os Serviços, incluindo hospedagem, infraestrutura, autenticação, analytics operacional, atendimento e processamento de pagamentos. Esses terceiros recebem acesso apenas ao necessário para prestar o serviço contratado.
+Não vendemos nem compartilhamos informações pessoais para publicidade comportamental entre contextos.
 
-### Operações societárias
+## 7. Seus direitos
 
-Se o KYNS participar de fusão, aquisição, reorganização, falência, transação estratégica ou transferência de ativos, informações pessoais podem ser divulgadas a partes envolvidas e transferidas como parte da operação.
+Dependendo da sua localização, você pode ter certos direitos legais em relação às suas informações pessoais, incluindo o direito de:
 
-### Exigência legal
+- Acessar suas informações pessoais e como elas são processadas;
+- Deletar suas informações pessoais dos nossos registros;
+- Corrigir ou atualizar suas informações pessoais;
+- Transferir suas informações pessoais a terceiros (portabilidade de dados);
+- Restringir como processamos suas informações pessoais;
+- Retirar consentimento quando aplicável;
+- Opor-se a como processamos suas informações pessoais;
+- Registrar reclamação junto à sua autoridade local de proteção de dados.
 
-Podemos divulgar informações pessoais se acreditarmos de boa-fé que isso é necessário para:
+Para exercer qualquer desses direitos, envie sua solicitação para `privacy@kyns.ai`.
 
-- cumprir lei, ordem judicial, processo legal ou obrigação regulatória;
-- proteger direitos, propriedade, segurança e integridade do KYNS;
-- investigar violações destes Termos ou de nossas políticas;
-- prevenir fraude, abuso ou atividade criminosa;
-- reduzir risco de dano real e iminente a pessoas.
+**Nota:** o conteúdo de conversas com mais de 24 horas não pode ser acessado, corrigido ou deletado porque já foi permanentemente removido dos nossos sistemas. Memórias personalizadas podem ser visualizadas, editadas e deletadas pelo usuário a qualquer momento pela interface da plataforma.
 
-## 7. O que não vendemos nem usamos para treino
+## 8. Crianças
 
-O KYNS:
+A plataforma é restrita a usuários com 18 anos ou mais. Não coletamos intencionalmente informações pessoais de menores de 18 anos. Se tomarmos conhecimento de que um usuário tem menos de 18 anos, encerraremos imediatamente a conta e deletaremos todos os dados associados. Entre em contato com `safety@kyns.ai` para reportar um menor usando a plataforma.
 
-- **não vende** suas informações pessoais;
-- **não compartilha** suas informações para publicidade comportamental entre contextos;
-- **não treina modelos de IA** com suas conversas, prompts, respostas ou imagens geradas.
+## 9. Segurança e retenção
 
-## 8. Retenção
+Implementamos medidas comercialmente razoáveis para proteger informações pessoais:
 
-Mantemos informações pessoais apenas pelo tempo necessário para:
+- Conexões criptografadas (TLS) para todos os dados em trânsito;
+- Proteção DDoS e Web Application Firewall;
+- Limitação de taxa e aplicação de CORS;
+- Hash de senha com bcrypt;
+- Dados de identificação do usuário excluídos das requisições ao modelo de IA.
 
-- fornecer os Serviços;
-- cumprir obrigações legais;
-- resolver disputas;
-- prevenir fraude ou abuso;
-- manter segurança e continuidade operacional.
+**Períodos de retenção:**
 
-Como o conteúdo das conversas não é armazenado em nossos servidores, ele não integra nossa retenção regular de dados de conteúdo.
+- Conteúdo de conversas e imagens: máximo 24 horas, depois permanentemente deletados;
+- Memórias personalizadas: retidas até que o usuário as delete ou desative o recurso;
+- Endereços IP: usados para limitação de taxa durante a sessão, não retidos em logs dedicados;
+- Informações de conta: retidas enquanto sua conta estiver ativa;
+- Após exclusão da conta: todos os dados permanentemente removidos em até 30 dias.
 
-## 9. Segurança
+## 10. Usuários internacionais
 
-Adotamos medidas técnicas, administrativas e organizacionais comercialmente razoáveis para proteger informações pessoais contra perda, uso indevido, acesso não autorizado, divulgação, alteração ou destruição.
+Ao usar nossos Serviços, você entende e reconhece que suas informações pessoais serão processadas em nossas instalações e servidores nos Estados Unidos e podem ser divulgadas a nossos prestadores de serviço em outras jurisdições.
 
-Nenhum sistema conectado à internet é absolutamente seguro. Você é responsável por proteger o dispositivo e o navegador que utiliza para acessar o KYNS.
+## 11. Alterações nesta Política
 
-## 10. Seus direitos
+Podemos atualizar esta Política de Privacidade periodicamente. Alterações materiais receberão aviso de pelo menos 30 dias via e-mail ou notificação na plataforma. Se não concordar, você deve parar de usar os Serviços.
 
-Dependendo da sua localização, você pode ter direitos legais sobre suas informações pessoais, incluindo:
+## 12. Contato
 
-- acessar as informações pessoais que mantemos sobre você;
-- corrigir dados imprecisos;
-- solicitar exclusão;
-- solicitar cópia ou portabilidade quando aplicável.
+- Questões de privacidade: `privacy@kyns.ai`
+- Segurança de menores: `safety@kyns.ai`
 
-Para exercer esses direitos, escreva para: `contact@kyns.ai`.
-
-## 11. Crianças
-
-Os Serviços são destinados apenas a pessoas com **18 anos ou mais**. O KYNS não é direcionado a crianças nem adolescentes.
-
-## 12. Links para terceiros
-
-Os Serviços podem conter links para sites e serviços de terceiros. O KYNS não controla e não é responsável pelas práticas de privacidade desses terceiros. Recomendamos que você leia as políticas aplicáveis antes de usar qualquer serviço externo.
-
-## 13. Alterações nesta Política
-
-Podemos atualizar esta Política de Privacidade periodicamente. Quando houver mudanças materiais, publicaremos a versão revisada com a data de vigência atualizada no site.
-
-## 14. Contato
-
-Dúvidas, solicitações de privacidade ou comunicações relacionadas a esta política devem ser enviadas para: `contact@kyns.ai`.
+**KYNS LLC** — Registrada no Estado de Delaware, Estados Unidos.

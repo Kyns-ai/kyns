@@ -8,7 +8,7 @@ Ao usar os Serviços, você concorda com estes Termos. Se não concordar, não u
 
 ## Quem somos
 
-O KYNS é uma plataforma de inteligência artificial generativa operada por **KYNS, Inc.**, uma corporation do Estado de Wyoming, Estados Unidos, com escritório registrado em Sheridan, Wyoming 82801.
+O KYNS é uma plataforma de inteligência artificial generativa operada por **KYNS LLC**, uma limited liability company registrada no Estado de Delaware, Estados Unidos.
 
 O KYNS oferece acesso a modelos open-source por meio de uma interface própria, com foco em privacidade, autonomia do usuário e responsabilidade individual.
 
@@ -154,11 +154,11 @@ Cláusulas sobre propriedade intelectual, isenção de garantias, limitação de
 
 ## 13. Lei Aplicável e Resolução de Disputas
 
-Estes Termos são regidos pelas leis do **Estado de Wyoming, EUA**, sem aplicação de regras de conflito de leis.
+Estes Termos são regidos pelas leis do **Estado de Delaware, EUA**, sem aplicação de regras de conflito de leis.
 
 Antes de iniciar arbitragem, você deve enviar notificação escrita ao KYNS e conceder ao menos **60 dias corridos** para tentativa de resolução informal da disputa.
 
-Se a disputa não for resolvida informalmente, ela será solucionada por **arbitragem obrigatória e vinculante em Wyoming**, sob as regras da **American Arbitration Association (AAA)**.
+Se a disputa não for resolvida informalmente, ela será solucionada por **arbitragem obrigatória e vinculante em Delaware**, sob as regras da **American Arbitration Association (AAA)**.
 
 Nada nestes Termos impede o KYNS de buscar tutela de urgência, medida cautelar ou providência equitativa em tribunal competente quando necessário para proteger seus direitos, propriedade, segurança ou operação.
 
@@ -208,4 +208,10 @@ Se você acredita que seus direitos autorais foram violados, envie notificação
 
 ## 20. Contato
 
-Para dúvidas sobre estes Termos, cancelamentos, notificações legais ou solicitações gerais, entre em contato por: `contact@kyns.ai`.
+- Consultas gerais: `legal@kyns.ai`
+- Questões de segurança: `security@kyns.ai`
+- Denúncias de abuso: `abuse@kyns.ai`
+- Segurança de menores: `safety@kyns.ai`
+- Reclamações de copyright: `dmca@kyns.ai`
+
+**KYNS LLC** — Registrada no Estado de Delaware, Estados Unidos.

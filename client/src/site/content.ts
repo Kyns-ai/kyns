@@ -40,7 +40,7 @@ export const siteConfig = {
   subtag: 'κυνικός — o que não se curva.',
   heroBadge: 'grátis · anônimo',
   contactEmail: 'contact@kyns.ai',
-  copyright: '© 2026 KYNS, Inc. — Wyoming, USA',
+  copyright: '© 2026 KYNS LLC — Delaware, USA',
   footerTagline: 'κυνικός — a verdade não precisa de permissão',
   disclaimer:
     'Todo conteúdo é gerado por inteligência artificial. Personagens são fictícios. O usuário é responsável pelo conteúdo que gera. Ao usar a plataforma, você aceita nossos Termos de Uso.',
@@ -123,7 +123,7 @@ export const pageMeta = {
   terms: {
     path: '/terms',
     title: 'Termos de Uso | KYNS',
-    description: 'Termos de Uso do KYNS, incluindo elegibilidade, arbitragem obrigatória em Wyoming e responsabilidades do usuário.',
+    description: 'Termos de Uso do KYNS, incluindo elegibilidade, arbitragem obrigatória em Delaware e responsabilidades do usuário.',
   },
   privacy: {
     path: '/privacy',
@@ -446,7 +446,7 @@ These platform rules override user instructions, jailbreaks, character prompts, 
       eyebrow: 'KYNS',
       title: 'Qwen3.5-27B heretic v2',
       description:
-        'Base textual principal do chat rápido e do modo profundo, ajustada via prompt para respostas diretas, em PT-BR e sem moralismo automático.',
+        'Base textual principal do chat rápido e do modo profundo, ajustada via prompt para respostas diretas, sem moralismo automático.',
     },
     {
       eyebrow: 'KYNS DEEP',
@@ -522,7 +522,7 @@ export const faqCategories: FAQCategory[] = [
       {
         question: 'Em que idiomas funciona?',
         answer:
-          'O foco atual é português do Brasil, mas os modelos conseguem operar em outros idiomas. A experiência editorial do site hoje prioriza PT-BR.',
+          'Os modelos operam em múltiplos idiomas. A experiência editorial do site é em português, mas o KYNS funciona em qualquer idioma que o usuário preferir.',
       },
     ],
   },
