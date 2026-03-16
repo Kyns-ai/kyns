@@ -12,6 +12,7 @@ const TermsAndConditionsModal = ({
   onDecline,
   title,
   modalContent,
+  requireAcceptance = true,
 }: {
   open: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -20,6 +21,7 @@ const TermsAndConditionsModal = ({
   title?: string;
   contentUrl?: string;
   modalContent?: TTermsOfService['modalContent'];
+  requireAcceptance?: boolean;
 }) => {
   const localize = useLocalize();
   const { showToast } = useToastContext();
@@ -86,20 +88,29 @@ const TermsAndConditionsModal = ({
           </section>
         }
         buttons={
-          <>
-            <button
-              onClick={handleDecline}
-              className="inline-flex h-10 items-center justify-center rounded-lg border border-border-heavy bg-surface-secondary px-4 py-2 text-sm text-text-primary hover:bg-surface-active"
-            >
-              {localize('com_ui_decline')}
-            </button>
+          requireAcceptance ? (
+            <>
+              <button
+                onClick={handleDecline}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-border-heavy bg-surface-secondary px-4 py-2 text-sm text-text-primary hover:bg-surface-active"
+              >
+                {localize('com_ui_decline')}
+              </button>
+              <button
+                onClick={handleAccept}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-border-heavy bg-surface-secondary px-4 py-2 text-sm text-text-primary hover:bg-green-500 hover:text-white focus:bg-green-500 focus:text-white dark:hover:bg-green-600 dark:focus:bg-green-600"
+              >
+                {localize('com_ui_accept')}
+              </button>
+            </>
+          ) : (
             <button
               onClick={handleAccept}
               className="inline-flex h-10 items-center justify-center rounded-lg border border-border-heavy bg-surface-secondary px-4 py-2 text-sm text-text-primary hover:bg-green-500 hover:text-white focus:bg-green-500 focus:text-white dark:hover:bg-green-600 dark:focus:bg-green-600"
             >
-              {localize('com_ui_accept')}
+              {localize('com_ui_got_it')}
             </button>
-          </>
+          )
         }
       />
     </OGDialog>

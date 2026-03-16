@@ -105,6 +105,7 @@ export default function Root() {
               onDecline={handleDeclineTerms}
               title={config.interface.termsOfService.modalTitle}
               modalContent={config.interface.termsOfService.modalContent}
+              requireAcceptance={false}
             />
           )}
         </AssistantsMapContext.Provider>
