@@ -1,6 +1,6 @@
 apiVersion: v2
 name: librechat-rag-api
-description: A Helm chart for LibreChat
+description: A Helm chart for KYNS RAG API
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -24,7 +24,7 @@ version: 0.5.3
 # renovate: image=registry.librechat.ai/danny-avila/librechat-rag-api-dev
 appVersion: "v0.4.0"
 
-home: https://www.librechat.ai
+home: https://kyns.ai
 
 dependencies:
   - name: postgresql
