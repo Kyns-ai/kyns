@@ -202,5 +202,9 @@
     "framer-motion": "^12.35.2",
     "lucide-react": "^0.525.0",
     "react-hook-form": "^7.71.2"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
+    "@rollup/rollup-linux-x64-musl": "^4.59.0"
   }
 }
