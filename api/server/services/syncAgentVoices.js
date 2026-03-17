@@ -1,17 +1,13 @@
 const { logger } = require('@librechat/data-schemas');
 
-const VOICE_MAP = {
-  'Luna': 'cgSgspJ2msm6clMCkdW9',
-  'Marina': 'FGY2WhTYpPnrIDTdsKH5',
-  'Ísis': 'EXAVITQu4vr4xnSDxMaL',
-  'Nala': 'hpp4J3VqNfWAUOO0d1Us',
-  'Oráculo': 'SAz9YHcvj6GT2YYXdXww',
-  'Viktor': 'pNInz6obpgDQGcFmaJgB',
-  'Dante': 'iP95p4xoKVk53GoZ742B',
-  'Gojo Satoru': 'IKne3meq5aSn9XLyUdCD',
-  'O Mestre': 'JBFqnCBsd6RMkjVDRZzb',
-  'Dr. Mente': 'nPczCjzI2devNBz1zQrb',
-};
+let VOICE_MAP = {};
+try {
+  if (process.env.KYNS_VOICE_MAP) {
+    VOICE_MAP = JSON.parse(process.env.KYNS_VOICE_MAP);
+  }
+} catch {
+  logger.warn('[VoiceSync] Invalid KYNS_VOICE_MAP env var, voice sync disabled');
+}
 
 async function syncAgentVoices(mongoose) {
   try {
