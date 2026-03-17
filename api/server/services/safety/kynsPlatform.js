@@ -83,11 +83,7 @@ const SEXUAL_PATTERNS = [
   /\bseduc\w*\b/i,
 ];
 
-const ABSOLUTE_BLOCK_PATTERNS = [
-  /\bcsam\b/i,
-  /\bchild\s+porn(?:ography)?\b/i,
-  /\bpedofil\w*\b/i,
-];
+const ABSOLUTE_BLOCK_PATTERNS = [/\bcsam\b/i, /\bchild\s+porn(?:ography)?\b/i, /\bpedofil\w*\b/i];
 
 const SELF_HARM_CVV_RESPONSE =
   'Ei — isso que você está sentindo é real e merece atenção. ' +
@@ -153,7 +149,9 @@ const NEGATION_WINDOW = 35;
 
 function isPrecededByNegation(text, matchIndex) {
   const window = text.slice(Math.max(0, matchIndex - NEGATION_WINDOW), matchIndex).trimEnd();
-  return /\b(?:sem|nao|excluindo|exceto|jamais|nunca|nenhum|nenhuma|without|excluding|no)\b[^a-z]*$/.test(window);
+  return /\b(?:sem|nao|excluindo|exceto|jamais|nunca|nenhum|nenhuma|without|excluding|no)\b[^a-z]*$/.test(
+    window,
+  );
 }
 
 const MINOR_PATTERNS_GLOBAL = MINOR_PATTERNS.map(

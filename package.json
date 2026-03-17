@@ -196,10 +196,6 @@
     ]
   },
   "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/core": "^2.0.1",
-    "@opentelemetry/exporter-trace-otlp-http": ">=0.202.0 <1.0.0",
-    "@opentelemetry/sdk-trace-base": "^2.0.1",
     "@radix-ui/react-slot": "^1.2.4",
     "@react-spring/web": "^10.0.3",
     "@tanstack/react-virtual": "^3.13.21",

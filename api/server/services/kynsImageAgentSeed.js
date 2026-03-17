@@ -6,7 +6,8 @@ const { logger } = require('@librechat/data-schemas');
 const { Agent, User } = require('~/db/models');
 
 const KYNS_IMAGE_AGENT_ID = 'kyns-image-agent';
-const KYNS_IMAGE_AGENT_MODEL = process.env.KYNS_IMAGE_AGENT_MODEL || 'llmfan46/Qwen3.5-27B-heretic-v2';
+const KYNS_IMAGE_AGENT_MODEL =
+  process.env.KYNS_IMAGE_AGENT_MODEL || 'llmfan46/Qwen3.5-27B-heretic-v2';
 
 async function seedKynsImageAgent() {
   try {
@@ -17,14 +18,17 @@ async function seedKynsImageAgent() {
 
     const adminUser = await User.findOne({ role: 'ADMIN' }).lean();
     if (!adminUser) {
-      logger.warn('[KynsImageSeed] No admin user found — skipping image agent seed. Will retry next restart.');
+      logger.warn(
+        '[KynsImageSeed] No admin user found — skipping image agent seed. Will retry next restart.',
+      );
       return;
     }
 
     await Agent.create({
       id: KYNS_IMAGE_AGENT_ID,
       name: 'KYNS Image',
-      description: 'Geração de imagens com IA. Lustify v7 (fotorrealista, NSFW) ou Z-Image Turbo (alta qualidade). Limite: 10 imagens/dia.',
+      description:
+        'Geração de imagens com IA. Lustify v7 (fotorrealista, NSFW) ou Z-Image Turbo (alta qualidade). Limite: 10 imagens/dia.',
       instructions: `You are KYNS Image — a specialized AI assistant for generating images. Your sole purpose is to generate images based on user descriptions.
 
 When the user describes an image they want:

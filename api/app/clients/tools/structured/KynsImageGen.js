@@ -30,7 +30,8 @@ const kynsImageSchema = {
     model: {
       type: 'string',
       enum: ['lustify', 'zimage'],
-      description: '"lustify" for Lustify v7 (SDXL, photorealistic/NSFW, 30 steps). "zimage" for Z-Image Turbo (DiT, fast high-quality, 8 steps).',
+      description:
+        '"lustify" for Lustify v7 (SDXL, photorealistic/NSFW, 30 steps). "zimage" for Z-Image Turbo (DiT, fast high-quality, 8 steps).',
     },
     width: {
       type: 'integer',
@@ -99,11 +100,25 @@ async function addWatermark(buffer) {
 
   let x, y;
   switch (config.position || 'bottom-right') {
-    case 'top-left': x = margin; y = textH + margin; break;
-    case 'top-right': x = w - textW - margin; y = textH + margin; break;
-    case 'bottom-left': x = margin; y = h - margin; break;
-    case 'center': x = (w - textW) / 2; y = (h + textH) / 2; break;
-    default: x = w - textW - margin; y = h - margin;
+    case 'top-left':
+      x = margin;
+      y = textH + margin;
+      break;
+    case 'top-right':
+      x = w - textW - margin;
+      y = textH + margin;
+      break;
+    case 'bottom-left':
+      x = margin;
+      y = h - margin;
+      break;
+    case 'center':
+      x = (w - textW) / 2;
+      y = (h + textH) / 2;
+      break;
+    default:
+      x = w - textW - margin;
+      y = h - margin;
   }
 
   const svg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
@@ -173,8 +188,7 @@ class KynsImageGen extends Tool {
       process.env.RUNPOD_API_KEY ||
       '';
 
-    this.endpointId =
-      fields.RUNPOD_IMAGE_ENDPOINT_ID || process.env.RUNPOD_IMAGE_ENDPOINT_ID || '';
+    this.endpointId = fields.RUNPOD_IMAGE_ENDPOINT_ID || process.env.RUNPOD_IMAGE_ENDPOINT_ID || '';
 
     if (!this.apiKey && !this.override) {
       throw new Error('Missing RUNPOD_IMAGE_API_KEY environment variable.');

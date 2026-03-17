@@ -92,7 +92,7 @@ function getSignedRequesterUserId(req) {
       audience: IMAGE_PROXY_USER_TOKEN_AUDIENCE,
     });
     return typeof payload?.sub === 'string' && payload.sub.length > 0 ? payload.sub : null;
-  } catch (error) {
+  } catch (_error) {
     logger.warn('[imageProxy] Invalid signed user token');
     return null;
   }
@@ -104,20 +104,22 @@ function logRunpodError(jobId, output) {
     if (!db || !output) {
       return;
     }
-    db.collection('kyns_error_logs').insertOne({
-      source: 'runpod',
-      level: 'error',
-      message: String(output.error || 'RunPod job failed').slice(0, 1000),
-      errorType: output.error_type || null,
-      stack: typeof output.traceback === 'string' ? output.traceback.slice(0, 3000) : null,
-      metadata: {
-        jobId,
-        model: output.model || null,
-        gpuMemory: output.gpu_memory || null,
-        preloadErrors: output.preload_errors || null,
-      },
-      createdAt: new Date(),
-    }).catch(() => {});
+    db.collection('kyns_error_logs')
+      .insertOne({
+        source: 'runpod',
+        level: 'error',
+        message: String(output.error || 'RunPod job failed').slice(0, 1000),
+        errorType: output.error_type || null,
+        stack: typeof output.traceback === 'string' ? output.traceback.slice(0, 3000) : null,
+        metadata: {
+          jobId,
+          model: output.model || null,
+          gpuMemory: output.gpu_memory || null,
+          preloadErrors: output.preload_errors || null,
+        },
+        createdAt: new Date(),
+      })
+      .catch(() => {});
   } catch {
     // Silent
   }
@@ -154,14 +156,21 @@ async function pollRunpodJob(endpointId, jobId, apiKey) {
       const elapsed = Date.now() - start;
       if (!firstWorkerSeen && elapsed > NO_WORKER_CANCEL_MS) {
         const health = await axios
-          .get(healthUrl, { headers: { Authorization: `Bearer ${apiKey}` }, timeout: RUNPOD_POLL_REQUEST_TIMEOUT_MS })
+          .get(healthUrl, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+            timeout: RUNPOD_POLL_REQUEST_TIMEOUT_MS,
+          })
           .catch(() => ({ data: { workers: {} } }));
         const w = health.data?.workers ?? {};
         const hasWorkers =
           (w.idle ?? 0) + (w.initializing ?? 0) + (w.ready ?? 0) + (w.running ?? 0) > 0;
         if (!hasWorkers) {
           await axios
-            .post(cancelUrl, {}, { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10_000 })
+            .post(
+              cancelUrl,
+              {},
+              { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10_000 },
+            )
             .catch(() => {});
           throw new Error(
             'Sem GPU disponível agora. O servidor de imagem está aquecendo — tente novamente em 1-2 minutos.',
@@ -235,7 +244,13 @@ const imageGenerationBurstLimiter = rateLimit({
   },
   store: limiterCache('image_generation_burst_limiter'),
   handler: (_req, res) =>
-    res.status(200).json(makeResponse('Muitas requisições em sequência. Aguarde um minuto antes de gerar outra imagem.')),
+    res
+      .status(200)
+      .json(
+        makeResponse(
+          'Muitas requisições em sequência. Aguarde um minuto antes de gerar outra imagem.',
+        ),
+      ),
 });
 
 const imageGenerationLimiter = rateLimit({
@@ -280,7 +295,11 @@ function authenticateImageProxyRequest(req, res, next) {
 async function imageRequestHandler(req, res) {
   try {
     if (runpodCircuit.isOpen()) {
-      return res.json(makeResponse('O servidor de imagens está temporariamente indisponível. Tente novamente em 1 minuto.'));
+      return res.json(
+        makeResponse(
+          'O servidor de imagens está temporariamente indisponível. Tente novamente em 1 minuto.',
+        ),
+      );
     }
 
     const apiKey = getRunpodKey();
@@ -318,10 +337,16 @@ async function imageRequestHandler(req, res) {
       const msg = err?.message ?? '';
       logger.error('[imageProxy] Failed to submit RunPod job:', err?.response?.data ?? msg);
       if (/timeout|ETIMEDOUT|ECONNABORTED/i.test(msg)) {
-        return res.json(makeResponse('O servidor de imagens demorou para responder. Tente novamente.'));
+        return res.json(
+          makeResponse('O servidor de imagens demorou para responder. Tente novamente.'),
+        );
       }
       if (/ECONNREFUSED|ECONNRESET|Connection error/i.test(msg)) {
-        return res.json(makeResponse('Falha de conexão com o servidor de imagens. Tente novamente em alguns instantes.'));
+        return res.json(
+          makeResponse(
+            'Falha de conexão com o servidor de imagens. Tente novamente em alguns instantes.',
+          ),
+        );
       }
       return res.json(makeResponse('Erro ao enviar requisição de imagem. Tente novamente.'));
     }
@@ -379,7 +404,19 @@ async function imageRequestHandler(req, res) {
   }
 }
 
-router.post('/chat/completions', authenticateImageProxyRequest, imageGenerationBurstLimiter, imageGenerationLimiter, imageRequestHandler);
-router.post('/v1/chat/completions', authenticateImageProxyRequest, imageGenerationBurstLimiter, imageGenerationLimiter, imageRequestHandler);
+router.post(
+  '/chat/completions',
+  authenticateImageProxyRequest,
+  imageGenerationBurstLimiter,
+  imageGenerationLimiter,
+  imageRequestHandler,
+);
+router.post(
+  '/v1/chat/completions',
+  authenticateImageProxyRequest,
+  imageGenerationBurstLimiter,
+  imageGenerationLimiter,
+  imageRequestHandler,
+);
 
 module.exports = router;

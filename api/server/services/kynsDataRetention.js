@@ -80,7 +80,10 @@ async function runRetentionCycle() {
     await purgeExpiredMessages();
     purgeOldImages();
   } catch (err) {
-    logger.error('[kynsDataRetention] Error during retention cycle:', err.stack ?? err.message ?? String(err));
+    logger.error(
+      '[kynsDataRetention] Error during retention cycle:',
+      err.stack ?? err.message ?? String(err),
+    );
   }
 }
 

@@ -27,10 +27,7 @@ function Footer({ className }: { className?: string }) {
   const mainContentParts = (
     typeof config?.customFooter === 'string'
       ? config.customFooter
-      : '[KYNS ' +
-        Constants.VERSION +
-        '](https://kyns.ai) - ' +
-        localize('com_ui_latest_footer')
+      : '[KYNS ' + Constants.VERSION + '](https://kyns.ai) - ' + localize('com_ui_latest_footer')
   ).split('|');
 
   useEffect(() => {
