@@ -52,7 +52,7 @@ jobs:
       # Run Helm OCI Charts Releaser
       # This is for the librechat chart
       - name: Release Helm OCI Charts for librechat
-        uses: appany/helm-oci-chart-releaser@v0.4.2
+        uses: appany/helm-oci-chart-releaser@v0.5.0
         with:
           name: librechat
           repository: ${{ github.actor }}/librechat-chart
@@ -64,7 +64,7 @@ jobs:
       
       # this is for the librechat-rag-api chart
       - name: Release Helm OCI Charts for librechat-rag-api
-        uses: appany/helm-oci-chart-releaser@v0.4.2
+        uses: appany/helm-oci-chart-releaser@v0.5.0
         with:
           name: librechat-rag-api
           repository: ${{ github.actor }}/librechat-chart
