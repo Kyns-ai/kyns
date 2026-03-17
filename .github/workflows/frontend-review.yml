@@ -107,13 +107,13 @@ jobs:
         run: npm ci
 
       - name: Download data-provider build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-provider
           path: packages/data-provider/dist
 
       - name: Download client-package build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-client-package
           path: packages/client/dist
@@ -151,13 +151,13 @@ jobs:
         run: npm ci
 
       - name: Download data-provider build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-provider
           path: packages/data-provider/dist
 
       - name: Download client-package build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-client-package
           path: packages/client/dist
@@ -195,13 +195,13 @@ jobs:
         run: npm ci
 
       - name: Download data-provider build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-provider
           path: packages/data-provider/dist
 
       - name: Download client-package build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-client-package
           path: packages/client/dist

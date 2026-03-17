@@ -127,13 +127,13 @@ jobs:
         run: npm ci
 
       - name: Download data-provider build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-provider
           path: packages/data-provider/dist
 
       - name: Download data-schemas build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-schemas
           path: packages/data-schemas/dist
@@ -196,19 +196,19 @@ jobs:
         run: npm ci
 
       - name: Download data-provider build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-provider
           path: packages/data-provider/dist
 
       - name: Download data-schemas build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-schemas
           path: packages/data-schemas/dist
 
       - name: Download api build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-api
           path: packages/api/dist
@@ -254,7 +254,7 @@ jobs:
         run: npm ci
 
       - name: Download data-provider build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-provider
           path: packages/data-provider/dist
@@ -292,13 +292,13 @@ jobs:
         run: npm ci
 
       - name: Download data-provider build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-provider
           path: packages/data-provider/dist
 
       - name: Download data-schemas build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-schemas
           path: packages/data-schemas/dist
@@ -336,19 +336,19 @@ jobs:
         run: npm ci
 
       - name: Download data-provider build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-provider
           path: packages/data-provider/dist
 
       - name: Download data-schemas build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-data-schemas
           path: packages/data-schemas/dist
 
       - name: Download api build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build-api
           path: packages/api/dist
