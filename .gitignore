@@ -180,3 +180,21 @@ hive-mind-prompt-*.txt
 !analytics/src/app/dashboard/logs/
 !analytics/src/app/dashboard/logs/page.tsx
 .kyns-session.json
+
+# Proprietary agent/character configs
+config/agents-with-universal-rules.json
+config/agents-11-final.json
+config/agents-starters-patch.json
+config/kynsAgentAvatarDefinitions.js
+config/UNIVERSAL_RULES_README.md
+
+# Internal QA and benchmark artifacts
+kyns-benchmark-results.md
+e2e/kyns-benchmark-live-results.json
+e2e/kyns-image-*.png
+e2e/.artifacts/
+e2e/playwright-report-kyns/
+e2e/storageState.kyns.json
+e2e/specs/.test-results-kyns/
+docs/QA_AUDIT_*.md
+docs/QA_RELEASE_AUDIT.md
