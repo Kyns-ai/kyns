@@ -22,7 +22,7 @@ function getSecret(): Uint8Array {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('SESSION_SECRET environment variable is required in production')
     }
-    return new TextEncoder().encode('kyns-analytics-dev-secret-change-in-prod')
+    return new TextEncoder().encode('dev-secret-change-in-prod')
   }
   return new TextEncoder().encode(secret)
 }

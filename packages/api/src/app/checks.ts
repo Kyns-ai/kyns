@@ -6,10 +6,10 @@ import { isEnabled, checkEmailConfig } from '~/utils';
 import { handleRateLimits } from './limits';
 
 const secretDefaults = {
-  CREDS_KEY: 'f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0',
-  CREDS_IV: 'e2341419ec3dd3d19b13a1a87fafcbfb',
-  JWT_SECRET: '16f8c0ef4a5d391b26034086c628469d3f9f497f08163ab9b40137092f2909ef',
-  JWT_REFRESH_SECRET: 'eaa5191f2914e30b9387fd84e254e4ba6fc51b4654968a9b0803b456a54b8418',
+  CREDS_KEY: '8f10ea9e1ee842aec746929b41c5923069abeda58a0465f79e809f8dbe5f8ac5',
+  CREDS_IV: '5372883fb41660ae5366f0b27df2e211',
+  JWT_SECRET: '4cc69581147dbac1e0e964daf9f8487a8fd889bd47fc40d00141962e48ef3a2e',
+  JWT_REFRESH_SECRET: '58039b593ac6db4262c1afd7b26261dafe34e7e4950fc81e5b1d6a5304b4026f',
 };
 
 const deprecatedVariables = [
