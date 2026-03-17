@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { Message, Conversation } = require('~/models');
+const { Message, Conversation } = require('~/db/models');
 const { logger } = require('~/config');
 const paths = require('~/config/paths');
 
@@ -8,11 +8,21 @@ const RETENTION_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = 60 * 60 * 1000;
 
 async function purgeExpiredMessages() {
-  const cutoff = new Date(Date.now() - RETENTION_MS);
+  const expiredConvos = await Conversation.find(
+    { expiredAt: { $ne: null } },
+    { conversationId: 1 },
+  ).lean();
+
+  if (expiredConvos.length === 0) {
+    return;
+  }
+
+  const expiredConvoIds = expiredConvos.map((c) => c.conversationId);
   const result = await Message.updateMany(
-    { expiredAt: null, createdAt: { $lt: cutoff } },
+    { expiredAt: null, conversationId: { $in: expiredConvoIds } },
     { $set: { expiredAt: new Date() } },
   );
+
   if (result.modifiedCount > 0) {
     logger.info(`[kynsDataRetention] Marked ${result.modifiedCount} messages as expired`);
   }

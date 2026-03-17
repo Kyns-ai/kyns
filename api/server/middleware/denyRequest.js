@@ -26,7 +26,7 @@ const denyRequest = async (req, res, errorMessage) => {
     responseText = JSON.stringify(errorMessage);
   }
 
-  const { messageId, conversationId: _convoId, parentMessageId, text } = req.body;
+  const { messageId, conversationId: _convoId, parentMessageId, text } = req.body ?? {};
   const conversationId = _convoId ?? crypto.randomUUID();
 
   const userMessage = {
