@@ -223,7 +223,14 @@ const imageGenerationLimiter = rateLimit({
   legacyHeaders: false,
   skipFailedRequests: true,
   skip: (req) => !getRequesterUserId(req),
-  keyGenerator: (req) => String(getRequesterUserId(req) ?? req.ip),
+  keyGenerator: (req) => {
+    const userId = getRequesterUserId(req);
+    if (userId) {
+      return String(userId);
+    }
+    const ip = req.ip ?? '127.0.0.1';
+    return ip.startsWith('::ffff:') ? ip.slice(7) : ip;
+  },
   requestWasSuccessful: (_req, res) => res.locals.imageGenerationCountable === true,
   store: limiterCache('image_generation_user_limiter'),
   handler: (_req, res) => res.status(200).json(makeResponse(makeDailyLimitMessage())),
