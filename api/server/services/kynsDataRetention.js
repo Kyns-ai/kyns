@@ -71,7 +71,7 @@ async function runRetentionCycle() {
     await Promise.all([purgeExpiredMessages(), purgeExpiredConversations()]);
     purgeOldImages();
   } catch (err) {
-    logger.error('[kynsDataRetention] Error during retention cycle:', err.message);
+    logger.error('[kynsDataRetention] Error during retention cycle:', err.stack ?? err.message ?? String(err));
   }
 }
 
