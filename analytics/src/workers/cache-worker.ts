@@ -7,6 +7,7 @@ import { getActivationFunnel, getTimeToFirstMessage, getActivationRate } from '.
 import { getConversationStats, getTopFirstMessageWords, getMessageLengthDistribution } from '../lib/queries/behavior'
 import { getWeeklyChurn } from '../lib/queries/growth'
 import { getDailyErrorRate } from '../lib/queries/quality'
+import { getErrorLogStats } from '../lib/queries/error-logs'
 import { getInfrastructureStatus, logUptimeCheck } from '../lib/queries/admin-infrastructure'
 
 async function safeRun<T>(label: string, fn: () => Promise<T>): Promise<void> {
@@ -57,6 +58,7 @@ async function runAllAggregations() {
     safeRun('Msg length', () => getMessageLengthDistribution()),
     safeRun('Churn', () => getWeeklyChurn(8)),
     safeRun('Error rate', () => getDailyErrorRate(14)),
+    safeRun('Error log stats', () => getErrorLogStats()),
   ])
 
   await safeRun('Alerts', checkAndSendAlerts)

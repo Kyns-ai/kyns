@@ -14,6 +14,7 @@ import os
 import io
 import base64
 import logging
+import traceback
 
 import torch
 import runpod
@@ -35,6 +36,17 @@ MODEL_DEFAULTS = {
 }
 
 pipes: dict = {}
+_preload_errors: list = []
+
+
+def _gpu_memory() -> dict | None:
+    if not torch.cuda.is_available():
+        return None
+    return {
+        "allocated_mb": round(torch.cuda.memory_allocated() / 1024 / 1024, 1),
+        "reserved_mb": round(torch.cuda.memory_reserved() / 1024 / 1024, 1),
+        "total_mb": round(torch.cuda.get_device_properties(0).total_mem / 1024 / 1024, 1),
+    }
 
 
 def _cache_dir() -> str:
@@ -64,6 +76,7 @@ def load_flux2klein():
         return pipe
     except Exception as e:
         logger.error("Failed to load FLUX.2 Klein 9B: %s", e)
+        _preload_errors.append({"model": "flux2klein", "error": str(e), "trace": traceback.format_exc()[:2000]})
         return None
 
 
@@ -81,6 +94,7 @@ def load_zimage():
         return pipe
     except Exception as e:
         logger.error("Failed to load Z-Image Turbo: %s", e)
+        _preload_errors.append({"model": "zimage", "error": str(e), "trace": traceback.format_exc()[:2000]})
         return None
 
 
@@ -122,7 +136,7 @@ def handler(job: dict) -> dict:
     height = max(64, min(2048, int(inp.get("height", 1024))))
 
     if not prompt:
-        return {"error": "prompt is required"}
+        return {"error": "prompt is required", "error_type": "validation"}
 
     defaults = MODEL_DEFAULTS.get(model_key, MODEL_DEFAULTS["flux2klein"])
     steps = int(inp.get("steps", defaults["steps"]))
@@ -130,7 +144,12 @@ def handler(job: dict) -> dict:
 
     pipe = pipes.get(model_key) or pipes.get("flux2klein")
     if pipe is None:
-        return {"error": "No image model available. Check logs for loading errors."}
+        return {
+            "error": "No image model available. Check logs for loading errors.",
+            "error_type": "model_unavailable",
+            "preload_errors": _preload_errors,
+            "gpu_memory": _gpu_memory(),
+        }
 
     logger.info(
         "Generating [%s] %dx%d steps=%d cfg=%.1f prompt='%.80s'",
@@ -145,15 +164,25 @@ def handler(job: dict) -> dict:
         "guidance_scale": cfg_scale,
     }
 
-    with torch.inference_mode():
-        result = pipe(**gen_kwargs)
+    try:
+        with torch.inference_mode():
+            result = pipe(**gen_kwargs)
 
-    image: Image.Image = result.images[0]
-    buf = io.BytesIO()
-    image.save(buf, format="PNG")
-    b64 = base64.b64encode(buf.getvalue()).decode()
-    logger.info("Image generated: %.1f KB (base64)", len(b64) / 1024)
-    return {"image": b64}
+        image: Image.Image = result.images[0]
+        buf = io.BytesIO()
+        image.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        logger.info("Image generated: %.1f KB (base64)", len(b64) / 1024)
+        return {"image": b64}
+    except Exception as e:
+        logger.error("Inference failed [%s]: %s", model_key, e)
+        return {
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "traceback": traceback.format_exc()[:2000],
+            "gpu_memory": _gpu_memory(),
+            "model": model_key,
+        }
 
 
 if __name__ == "__main__":

@@ -89,6 +89,13 @@ export async function ensureIndexes(): Promise<void> {
     ),
     database.collection('kyns_audit_log').createIndex({ createdAt: -1 }),
     database.collection('kyns_audit_log').createIndex({ action: 1, createdAt: -1 }),
+    database.collection('kyns_error_logs').createIndex({ createdAt: -1 }),
+    database.collection('kyns_error_logs').createIndex({ source: 1, createdAt: -1 }),
+    database.collection('kyns_error_logs').createIndex({ level: 1, createdAt: -1 }),
+    database.collection('kyns_error_logs').createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: 30 * 86400 }
+    ),
   ])
 }
 

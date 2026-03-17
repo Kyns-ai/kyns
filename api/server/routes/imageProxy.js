@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const express = require('express');
 const sharp = require('sharp');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { limiterCache } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const paths = require('~/config/paths');
@@ -95,6 +96,31 @@ function getSignedRequesterUserId(req) {
   }
 }
 
+function logRunpodError(jobId, output) {
+  try {
+    const db = mongoose.connection?.db;
+    if (!db || !output) {
+      return;
+    }
+    db.collection('kyns_error_logs').insertOne({
+      source: 'runpod',
+      level: 'error',
+      message: String(output.error || 'RunPod job failed').slice(0, 1000),
+      errorType: output.error_type || null,
+      stack: typeof output.traceback === 'string' ? output.traceback.slice(0, 3000) : null,
+      metadata: {
+        jobId,
+        model: output.model || null,
+        gpuMemory: output.gpu_memory || null,
+        preloadErrors: output.preload_errors || null,
+      },
+      createdAt: new Date(),
+    }).catch(() => {});
+  } catch {
+    // Silent
+  }
+}
+
 function makeDailyLimitMessage() {
   return `Você atingiu o limite de ${IMAGE_DAILY_LIMIT} imagens por dia. O limite reinicia à meia-noite (UTC).`;
 }
@@ -115,7 +141,10 @@ async function pollRunpodJob(endpointId, jobId, apiKey) {
     const resp = await axios.get(statusUrl, pollAxiosConfig);
     const { status, output, error } = resp.data;
     if (status === 'COMPLETED') return output;
-    if (status === 'FAILED' || error) throw new Error(`RunPod job failed: ${error || 'unknown'}`);
+    if (status === 'FAILED' || error) {
+      logRunpodError(jobId, output);
+      throw new Error(`RunPod job failed: ${output?.error || error || 'unknown'}`);
+    }
     if (status === 'CANCELLED') throw new Error('Geração cancelada.');
 
     if (status === 'IN_QUEUE' || status === 'IN_PROGRESS') {

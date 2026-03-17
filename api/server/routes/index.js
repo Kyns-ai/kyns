@@ -27,9 +27,11 @@ const tags = require('./tags');
 const auth = require('./auth');
 const keys = require('./keys');
 const user = require('./user');
+const clientErrors = require('./clientErrors');
 const mcp = require('./mcp');
 
 module.exports = {
+  clientErrors,
   mcp,
   auth,
   adminAuth,

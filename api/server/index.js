@@ -54,6 +54,15 @@ const startServer = async () => {
   await connectDb();
 
   logger.info('Connected to MongoDB');
+
+  /* Register MongoDB error log transport after DB is connected */
+  const MongoDBLogTransport = require('./utils/MongoDBLogTransport');
+  const mongoose = require('mongoose');
+  logger.add(new MongoDBLogTransport({
+    level: 'warn',
+    getDb: () => mongoose.connection?.db,
+  }));
+
   indexSync().catch((err) => {
     logger.error('[indexSync] Background sync failed:', err);
   });
@@ -117,6 +126,10 @@ const startServer = async () => {
   const trackResponseTime = require('./middleware/trackResponseTime');
   app.use(trackResponseTime);
 
+  /* Log HTTP 4xx/5xx responses for error dashboard */
+  const logErrorResponses = require('./middleware/logErrorResponses');
+  app.use(logErrorResponses);
+
   if (!isEnabled(DISABLE_COMPRESSION)) {
     app.use(compression());
   } else {
@@ -173,6 +186,7 @@ const startServer = async () => {
   app.use('/api/image-proxy', routes.imageProxy);
   app.use('/api/memories', routes.memories);
   app.use('/api/permissions', routes.accessPermissions);
+  app.use('/api/client-errors', routes.clientErrors);
 
   app.use('/api/tags', routes.tags);
   app.use('/api/mcp', routes.mcp);
