@@ -50,13 +50,13 @@ const denyRequest = async (req, res, errorMessage) => {
   }
 
   return await sendError(req, res, {
-    sender: getResponseSender(req.body),
+    sender: getResponseSender(req.body ?? {}),
     messageId: crypto.randomUUID(),
     conversationId,
     parentMessageId: userMessage.messageId,
     text: responseText,
     shouldSaveMessage,
-    user: req.user.id,
+    user: req.user?.id,
   });
 };
 
