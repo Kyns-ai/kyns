@@ -29,7 +29,7 @@ jobs:
 
       - name: Restore node_modules cache
         id: cache-node-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -44,7 +44,7 @@ jobs:
 
       - name: Restore data-provider build cache
         id: cache-data-provider
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: packages/data-provider/dist
           key: build-data-provider-${{ runner.os }}-${{ hashFiles('packages/data-provider/src/**', 'packages/data-provider/tsconfig*.json', 'packages/data-provider/rollup.config.js', 'packages/data-provider/package.json') }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Restore client-package build cache
         id: cache-client-package
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: packages/client/dist
           key: build-client-package-${{ runner.os }}-${{ hashFiles('packages/client/src/**', 'packages/client/tsconfig*.json', 'packages/client/rollup.config.js', 'packages/client/package.json', 'packages/data-provider/src/**', 'packages/data-provider/tsconfig*.json', 'packages/data-provider/rollup.config.js', 'packages/data-provider/package.json') }}
@@ -93,7 +93,7 @@ jobs:
 
       - name: Restore node_modules cache
         id: cache-node-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -137,7 +137,7 @@ jobs:
 
       - name: Restore node_modules cache
         id: cache-node-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -181,7 +181,7 @@ jobs:
 
       - name: Restore node_modules cache
         id: cache-node-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
