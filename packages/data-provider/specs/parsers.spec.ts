@@ -710,6 +710,8 @@ describe('extractDialogueForTTS', () => {
     const text = '<think>private reasoning</think>*Ela se aproxima.* "Agora me escuta."';
 
     expect(extractDialogueForTTS(text)).toBe('Agora me escuta.');
+  });
+});
 
 describe('extractSuggestions', () => {
   test('returns original text unchanged when no suggestions block is present', () => {

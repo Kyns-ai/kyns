@@ -2,6 +2,7 @@ import axios from 'axios';
 import { createAxiosInstance } from './axios';
 
 jest.mock('axios', () => ({
+  defaults: { timeout: undefined, headers: {} },
   interceptors: {
     request: { use: jest.fn(), eject: jest.fn() },
     response: { use: jest.fn(), eject: jest.fn() },

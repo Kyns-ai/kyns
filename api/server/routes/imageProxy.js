@@ -233,6 +233,7 @@ const imageGenerationBurstLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipFailedRequests: true,
+  validate: false,
   skip: (req) => !getRequesterUserId(req),
   keyGenerator: (req) => {
     const userId = getRequesterUserId(req);
@@ -259,6 +260,7 @@ const imageGenerationLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipFailedRequests: true,
+  validate: false,
   skip: (req) => !getRequesterUserId(req),
   keyGenerator: (req) => String(getRequesterUserId(req) ?? req.ip),
   requestWasSuccessful: (_req, res) => res.locals.imageGenerationCountable === true,

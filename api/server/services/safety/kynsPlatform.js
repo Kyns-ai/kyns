@@ -138,6 +138,9 @@ function prependKynsMasterPrompt(prompt) {
   if (!nextPrompt) {
     return KYNS_MASTER_PROMPT;
   }
+  if (!KYNS_MASTER_PROMPT) {
+    return nextPrompt;
+  }
   return `${KYNS_MASTER_PROMPT}\n\n${nextPrompt}`;
 }
 

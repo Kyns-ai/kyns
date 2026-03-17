@@ -11,6 +11,7 @@ jest.mock('~/utils', () => ({
 }));
 
 jest.mock('librechat-data-provider', () => ({
+  ...jest.requireActual('librechat-data-provider'),
   apiBaseUrl: () => '',
 }));
 

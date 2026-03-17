@@ -76,7 +76,7 @@ describe('cacheConfig', () => {
 
       await expect(async () => {
         await import('../cacheConfig');
-      }).rejects.toThrow('USE_REDIS is enabled but REDIS_URI is not set.');
+      }).rejects.toThrow('USE_REDIS is enabled but REDIS_URI (or REDIS_URL) is not set.');
     });
 
     test('should not throw error when USE_REDIS is enabled and REDIS_URI is set', async () => {
@@ -95,7 +95,7 @@ describe('cacheConfig', () => {
 
       await expect(async () => {
         await import('../cacheConfig');
-      }).rejects.toThrow('USE_REDIS is enabled but REDIS_URI is not set.');
+      }).rejects.toThrow('USE_REDIS is enabled but REDIS_URI (or REDIS_URL) is not set.');
     });
   });
 

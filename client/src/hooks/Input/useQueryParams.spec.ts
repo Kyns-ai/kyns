@@ -71,6 +71,7 @@ jest.mock('~/utils', () => {
     clearModelForNonEphemeralAgent: jest.fn(),
     removeUnavailableTools: jest.fn((preset) => preset),
     getModelSpecIconURL: jest.fn(() => 'icon-url'),
+    processValidSettings: jest.fn((params) => params),
     getConvoSwitchLogic: jest.fn(() => ({
       template: {},
       shouldSwitch: false,

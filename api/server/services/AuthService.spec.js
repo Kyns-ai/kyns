@@ -1,4 +1,5 @@
 jest.mock('@librechat/data-schemas', () => ({
+  ...jest.requireActual('@librechat/data-schemas'),
   logger: { info: jest.fn(), warn: jest.fn(), debug: jest.fn(), error: jest.fn() },
   DEFAULT_SESSION_EXPIRY: 900000,
   DEFAULT_REFRESH_TOKEN_EXPIRY: 604800000,

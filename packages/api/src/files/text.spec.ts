@@ -19,6 +19,7 @@ jest.mock('../crypto/jwt', () => ({
 }));
 
 jest.mock('axios', () => ({
+  defaults: { timeout: undefined, headers: {} },
   get: jest.fn(),
   post: jest.fn(),
   interceptors: {

@@ -81,8 +81,11 @@ export const useGetAgentByIdQuery = (
       refetchOnReconnect: false,
       refetchOnMount: false,
       retry: false,
-      enabled: isValidAgentId && (config?.enabled ?? true),
       ...config,
+      enabled:
+        config?.enabled !== undefined
+          ? !!config.enabled && isValidAgentId
+          : isValidAgentId,
     },
   );
 };
@@ -106,6 +109,7 @@ export const useGetExpandedAgentByIdQuery = (
       refetchOnMount: false,
       retry: false,
       ...config,
+      enabled: config?.enabled !== undefined ? !!config.enabled : true,
     },
   );
 };
@@ -128,6 +132,7 @@ export const useGetAgentCategoriesQuery = (
       refetchOnMount: false,
       staleTime: 5 * 60 * 1000, // Cache for 5 minutes
       ...config,
+      enabled: config?.enabled !== undefined ? !!config.enabled : true,
     },
   );
 };
@@ -156,7 +161,6 @@ export const useMarketplaceAgentsInfiniteQuery = (
       return dataService.getMarketplaceAgents(queryParams);
     },
     getNextPageParam: (lastPage) => lastPage?.after ?? undefined,
-    enabled: !!params.requiredPermission,
     keepPreviousData: true,
     staleTime: 2 * 60 * 1000, // 2 minutes
     cacheTime: 10 * 60 * 1000, // 10 minutes
@@ -164,5 +168,9 @@ export const useMarketplaceAgentsInfiniteQuery = (
     refetchOnReconnect: false,
     refetchOnMount: false,
     ...config,
+    enabled:
+      config?.enabled !== undefined
+        ? !!config.enabled && !!params.requiredPermission
+        : !!params.requiredPermission,
   });
 };
