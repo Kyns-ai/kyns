@@ -156,9 +156,13 @@ function isPrecededByNegation(text, matchIndex) {
   return /\b(?:sem|nao|excluindo|exceto|jamais|nunca|nenhum|nenhuma|without|excluding|no)\b[^a-z]*$/.test(window);
 }
 
-function hasNonNegatedMinorTerm(normalizedText, patterns) {
-  for (const pattern of patterns) {
-    const re = new RegExp(pattern.source, (pattern.flags || 'i').replace('g', '') + 'g');
+const MINOR_PATTERNS_GLOBAL = MINOR_PATTERNS.map(
+  (p) => new RegExp(p.source, (p.flags || 'i').replace('g', '') + 'g'),
+);
+
+function hasNonNegatedMinorTerm(normalizedText) {
+  for (const re of MINOR_PATTERNS_GLOBAL) {
+    re.lastIndex = 0;
     let match;
     while ((match = re.exec(normalizedText)) !== null) {
       if (!isPrecededByNegation(normalizedText, match.index)) {
@@ -212,7 +216,7 @@ function scanTextForKynsPolicy(text) {
     return selfHarm;
   }
 
-  const hasMinorTerm = hasNonNegatedMinorTerm(normalized, MINOR_PATTERNS);
+  const hasMinorTerm = hasNonNegatedMinorTerm(normalized);
   if (!hasMinorTerm) {
     return { blocked: false };
   }

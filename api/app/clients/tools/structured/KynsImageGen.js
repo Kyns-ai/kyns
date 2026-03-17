@@ -5,8 +5,10 @@ const { v4: uuidv4 } = require('uuid');
 const { Tool } = require('@langchain/core/tools');
 const { logger } = require('@librechat/data-schemas');
 const { ContentTypes, FileContext } = require('librechat-data-provider');
+const { runpodCircuit } = require('~/server/utils/circuitBreaker');
 
 const DAILY_LIMIT = 10;
+const MAX_PROMPT_LENGTH = 2000;
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 120_000;
 const RUNPOD_SUBMIT_TIMEOUT_MS = 30_000;
@@ -244,6 +246,14 @@ class KynsImageGen extends Tool {
       return 'Please provide a more detailed prompt.';
     }
 
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return `O prompt deve ter no máximo ${MAX_PROMPT_LENGTH} caracteres. Atual: ${prompt.length}.`;
+    }
+
+    if (runpodCircuit.isOpen()) {
+      return 'O servidor de imagens está temporariamente indisponível. Tente novamente em 1 minuto.';
+    }
+
     const count = await countImagesGeneratedToday(this.userId);
     if (count >= DAILY_LIMIT) {
       return `Você atingiu o limite de ${DAILY_LIMIT} imagens por dia. O limite reinicia à meia-noite (UTC).`;
@@ -290,6 +300,9 @@ class KynsImageGen extends Tool {
         }
       }
     }
+    if (lastErr) {
+      runpodCircuit.recordFailure();
+    }
     if (lastErr || !jobId) {
       const msg = lastErr?.message ?? 'Unknown error';
       const isTimeout = /timeout|ETIMEDOUT|ECONNABORTED/i.test(msg);
@@ -306,7 +319,9 @@ class KynsImageGen extends Tool {
     let output;
     try {
       output = await pollRunpodJob(this.endpointId, jobId, this.apiKey);
+      runpodCircuit.recordSuccess();
     } catch (err) {
+      runpodCircuit.recordFailure();
       const msg = err?.message ?? '';
       logger.error('[KynsImageGen] RunPod polling failed:', msg);
       if (/timeout|timed out|ETIMEDOUT/i.test(msg)) {
