@@ -1,7 +1,7 @@
 # v0.8.3
 
 # Base node image
-FROM node:20-alpine AS node
+FROM node:25-alpine AS node
 
 # Install runtime libraries and fonts used by sharp/libvips SVG text rendering
 RUN apk add --no-cache jemalloc su-exec fontconfig ttf-dejavu
