@@ -1,0 +1,52 @@
+<svg width="380" height="140" viewBox="0 0 380 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="50%" stop-color="#FF8C00"/>
+      <stop offset="100%" stop-color="#CC5500"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C8A86E"/>
+      <stop offset="100%" stop-color="#8B7444"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <radialGradient id="lanternLight" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#FFD700" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#FFD700" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- Subtle light glow behind -->
+  <ellipse cx="42" cy="45" rx="50" ry="55" fill="url(#lanternLight)"/>
+  
+  <!-- Lantern icon - Diogenes style -->
+  <g transform="translate(18, 12)" filter="url(#glow)">
+    <!-- Handle -->
+    <path d="M20 8 Q24 2 28 8" stroke="url(#metal)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <path d="M14 22 L12 40 Q12 48 24 48 Q36 48 36 40 L34 22 Z" stroke="url(#metal)" stroke-width="2" fill="none"/>
+    <!-- Top ring -->
+    <ellipse cx="24" cy="22" rx="10" ry="3" stroke="url(#metal)" stroke-width="2" fill="none"/>
+    <!-- Bottom -->
+    <ellipse cx="24" cy="48" rx="12" ry="3" stroke="url(#metal)" stroke-width="1.5" fill="none" opacity="0.5"/>
+    <!-- Flame -->
+    <path d="M24 38 Q20 32 22 28 Q24 24 24 24 Q24 24 26 28 Q28 32 24 38 Z" fill="url(#flame)"/>
+    <!-- Flame inner -->
+    <path d="M24 36 Q22 33 23 30 Q24 28 24 28 Q24 28 25 30 Q26 33 24 36 Z" fill="#FFF8DC" opacity="0.8"/>
+  </g>
+  
+  <!-- KYNS text -->
+  <text x="72" y="78" font-family="Georgia, Palatino, Times New Roman, serif" font-size="72" font-weight="700" fill="#E8DCC8" letter-spacing="10" font-variant="small-caps">KYNS</text>
+  
+  <!-- Subtle line -->
+  <line x1="72" y1="90" x2="310" y2="90" stroke="#C8A86E" stroke-width="0.5" opacity="0.4"/>
+  
+  <!-- Tagline -->
+  <text x="72" y="112" font-family="Georgia, serif" font-size="11" fill="#8B7444" letter-spacing="5" font-variant="small-caps">seek truth without filters</text>
+</svg>

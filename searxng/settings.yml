@@ -1,0 +1,103 @@
+# SearXNG settings — KYNS internal instance
+# Extends all SearXNG defaults; only overrides what we need.
+use_default_settings: true
+
+server:
+  # Override via SEARXNG_SETTINGS__SERVER__SECRET_KEY env var on Railway
+  secret_key: "kyns_searxng_change_me_in_production"
+  # Disable internal rate limiter — only LibreChat connects to this instance
+  limiter: false
+  image_proxy: false
+  http_protocol_version: "1.1"
+
+ui:
+  static_use_hash: true
+  default_locale: "pt-BR"
+  query_in_title: false
+  infinite_scroll: false
+  default_theme: simple
+
+search:
+  # 0 = off, 1 = moderate, 2 = strict
+  # LibreChat sends safeSearch per-request; permissive default here
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "pt-BR"
+  ban_time_on_fail: 5
+  max_ban_time_on_fail: 120
+  # REQUIRED: json format must be enabled for LibreChat integration
+  formats:
+    - html
+    - json
+
+engines:
+  # --- General web search ---
+  - name: google
+    engine: google
+    shortcut: g
+    disabled: false
+
+  - name: bing
+    engine: bing
+    shortcut: b
+    disabled: false
+
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: d
+    disabled: false
+
+  - name: brave
+    engine: brave
+    shortcut: br
+    disabled: false
+
+  # --- Reference ---
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    language: "pt"
+    disabled: false
+
+  # --- News ---
+  - name: google news
+    engine: google_news
+    shortcut: gn
+    disabled: false
+
+  - name: bing news
+    engine: bing_news
+    shortcut: bn
+    disabled: false
+
+  # --- Images ---
+  - name: google images
+    engine: google_images
+    shortcut: gi
+    disabled: false
+
+  - name: bing images
+    engine: bing_images
+    shortcut: bi
+    disabled: false
+
+  # --- Videos ---
+  - name: youtube
+    engine: youtube_noapi
+    shortcut: yt
+    disabled: false
+
+  # --- Code / Tech ---
+  - name: github
+    engine: github
+    shortcut: gh
+    disabled: false
+
+  - name: stackoverflow
+    engine: stackoverflow
+    shortcut: so
+    disabled: false
+
+outgoing:
+  useragent_suffix: ""
+  max_request_timeout: 10.0

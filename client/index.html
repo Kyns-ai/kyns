@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8" />
+    <base href="/" />
+    <meta name="theme-color" content="#FAFAF8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="KYNS — A verdade não precisa de permissão. Inteligência artificial sem censura e sem rastreamento." />
+    <meta name="rating" content="adult" />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:site_name" content="KYNS" />
+    <meta property="og:title" content="KYNS | A verdade não precisa de permissão" />
+    <meta property="og:description" content="Inteligência artificial sem censura, sem rastreamento de conversas e baseada em liberdade intelectual." />
+    <meta property="og:image" content="https://raw.githubusercontent.com/Kyns-ai/config/main/files/og-kyns.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://kyns.ai" />
+    <title>KYNS | A verdade não precisa de permissão</title>
+    <link rel="shortcut icon" href="/assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon-180x180.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; }
+
+      /* KYNS Gold Override */
+      .bg-green-500, .bg-green-600, .bg-green-700,
+      button.bg-green-500, button.bg-green-600, button.bg-green-700 {
+        background: linear-gradient(135deg, #D4B87A, #A08050) !important;
+        color: #060503 !important; font-weight: 600 !important; border: none !important;
+      }
+      .bg-green-500\/10, .bg-green-500\/20, .border-green-500, .border-green-500\/20 {
+        border-color: rgba(200,168,110,0.3) !important;
+        background-color: rgba(200,168,110,0.1) !important;
+      }
+      .bg-green-50\/50, .bg-green-950\/30 { background-color: rgba(200,168,110,0.08) !important; }
+      .bg-green-500:hover, .bg-green-600:hover, .bg-green-700:hover,
+      .hover\:bg-green-600:hover, .hover\:bg-green-700:hover {
+        background: linear-gradient(135deg, #E0C88A, #B89060) !important;
+      }
+      .text-green-100, .text-green-400, .text-green-500, .text-green-600, .text-green-700 { color: #C8A86E !important; }
+      .dark .dark\:text-green-100, .dark .dark\:text-green-300,
+      .dark .dark\:text-green-400, .dark .dark\:text-green-500 { color: #D4B87A !important; }
+      .hover\:text-green-700:hover, .dark .dark\:hover\:text-green-300:hover,
+      .dark .dark\:hover\:text-green-400:hover { color: #E0C88A !important; }
+      .focus\:border-green-500:focus { border-color: #C8A86E !important; }
+      .peer-focus\:text-green-500, .peer-focus\:text-green-600 { color: #C8A86E !important; }
+      .dark .dark\:peer-focus\:text-green-500 { color: #D4B87A !important; }
+      .hover\:decoration-green-700:hover, .focus\:decoration-green-700:focus,
+      .dark .dark\:hover\:decoration-green-400:hover,
+      .dark .dark\:focus\:decoration-green-400:focus { text-decoration-color: #C8A86E !important; }
+      .ring-green-500, .focus\:ring-green-500:focus { --tw-ring-color: rgba(200,168,110,0.5) !important; }
+      /* ─── KYNS Consumer UI: hide technical/admin elements ─────────────────── */
+
+      /* Import conversations in Settings > Data (not relevant to consumers) */
+      #import-conversation-label,
+      [aria-labelledby="import-conversation-label"],
+      div:has(> #import-conversation-label) { display: none !important; }
+
+      /* Agent API Keys section in Settings > Data */
+      [aria-labelledby="api-keys-label"],
+      #api-keys-label { display: none !important; }
+
+      /* "+" command description (multi-convo, disabled via config but tab may linger) */
+      /* Commands tab: hide +command and /command rows since multiConvo/prompts are off */
+      [data-testid="plusCommand"],
+      [data-testid="slashCommand"] { display: none !important; }
+
+      /* Hide any leftover "OpenAI / Anthropic / Azure" endpoint icons in convo headers */
+      [title="OpenAI"], [title="Anthropic"], [title="Azure OpenAI"],
+      [aria-label="OpenAI"], [aria-label="Anthropic"], [aria-label="Azure OpenAI"] {
+        display: none !important;
+      }
+    </style>
+    <script>
+      const theme = localStorage.getItem('color-theme');
+      const loadingContainerStyle = document.createElement('style');
+      let backgroundColor;
+      if (theme === 'dark') { backgroundColor = '#0d0d0d'; }
+      else if (theme === 'light') { backgroundColor = '#ffffff'; }
+      else if (theme === 'system') {
+        const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        backgroundColor = prefersDarkScheme ? '#0d0d0d' : '#ffffff';
+      } else { backgroundColor = '#ffffff'; }
+      loadingContainerStyle.innerHTML = `
+        #loading-container {
+          display: flex; align-items: center; justify-content: center;
+          height: 100vh; background-color: ${backgroundColor};
+        }
+      `;
+      document.head.appendChild(loadingContainerStyle);
+    </script>
+    <script defer type="module" src="/src/main.jsx"></script>
+  </head>
+  <body>
+    <div id="root">
+      <div id="loading-container"></div>
+    </div>
+  </body>
+</html>

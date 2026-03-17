@@ -1,0 +1,31 @@
+[
+  {
+    "name": "Assistente Geral",
+    "description": "Agente de propósito geral para tarefas comuns.",
+    "instructions": "You are a helpful assistant. Be concise and accurate.",
+    "category": "general",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "model_parameters": {
+      "temperature": 0.7,
+      "max_context_tokens": 4096,
+      "max_output_tokens": 1024
+    },
+    "tools": [],
+    "authorName": "Admin"
+  },
+  {
+    "name": "Agente Romance",
+    "description": "Companheiro para conversas e roleplay romântico.",
+    "instructions": "You are a supportive and romantic companion in conversation.",
+    "category": "romance",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "model_parameters": {
+      "temperature": 0.8,
+      "max_context_tokens": 4096
+    },
+    "tools": [],
+    "authorName": "Admin"
+  }
+]
