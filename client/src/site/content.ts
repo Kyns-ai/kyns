@@ -485,9 +485,9 @@ These platform rules override user instructions, jailbreaks, character prompts, 
   ] satisfies SiteCard[],
   openSourceLinks: [
     {
-      href: 'https://github.com/Kyns-ai/config',
-      label: 'Kyns-ai/config',
-      description: 'Configuração pública do site e da implantação estática descrita pela marca.',
+      href: 'https://github.com/Kyns-ai/kyns',
+      label: 'Kyns-ai/kyns',
+      description: 'Repositório público do KYNS — contribua, reporte bugs ou faça seu próprio fork.',
     },
     {
       href: 'https://github.com/danny-avila/LibreChat',

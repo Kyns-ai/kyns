@@ -1,307 +1,144 @@
 <p align="center">
-  <a href="https://librechat.ai">
-    <img src="client/public/assets/logo.svg" height="256">
+  <a href="https://kyns.ai">
+    <img src="client/public/assets/kyns-logo-mark.png" height="128">
   </a>
   <h1 align="center">
-    <a href="https://librechat.ai">LibreChat</a>
+    <a href="https://kyns.ai">KYNS</a>
   </h1>
 </p>
 
 <p align="center">
-  <a href="https://discord.librechat.ai"> 
-    <img
-      src="https://img.shields.io/discord/1086345563026489514?label=&logo=discord&style=for-the-badge&logoWidth=20&logoColor=white&labelColor=000000&color=blueviolet">
-  </a>
-  <a href="https://www.youtube.com/@LibreChat"> 
-    <img
-      src="https://img.shields.io/badge/YOUTUBE-red.svg?style=for-the-badge&logo=youtube&logoColor=white&labelColor=000000&logoWidth=20">
-  </a>
-  <a href="https://docs.librechat.ai"> 
-    <img
-      src="https://img.shields.io/badge/DOCS-blue.svg?style=for-the-badge&logo=read-the-docs&logoColor=white&labelColor=000000&logoWidth=20">
-  </a>
-  <a aria-label="Sponsors" href="https://github.com/sponsors/danny-avila">
-    <img
-      src="https://img.shields.io/badge/SPONSORS-brightgreen.svg?style=for-the-badge&logo=github-sponsors&logoColor=white&labelColor=000000&logoWidth=20">
-  </a>
+  <strong>Uncensored AI for authentic, unfiltered conversations.</strong><br>
+  Self-hostable. Privacy-first. Open-source.
 </p>
 
 <p align="center">
-<a href="https://railway.com/deploy/b5k2mn?referralCode=HI9hWz">
-  <img src="https://railway.com/button.svg" alt="Deploy on Railway" height="30">
-</a>
-<a href="https://zeabur.com/templates/0X2ZY8">
-  <img src="https://zeabur.com/button.svg" alt="Deploy on Zeabur" height="30"/>
-</a>
-<a href="https://template.cloud.sealos.io/deploy?templateName=librechat">
-  <img src="https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg" alt="Deploy on Sealos" height="30">
-</a>
-</p>
-
-<p align="center">
-  <a href="https://www.librechat.ai/docs/translation">
-    <img 
-      src="https://img.shields.io/badge/dynamic/json.svg?style=for-the-badge&color=2096F3&label=locize&query=%24.translatedPercentage&url=https://api.locize.app/badgedata/4cb2598b-ed4d-469c-9b04-2ed531a8cb45&suffix=%+translated" 
-      alt="Translation Progress">
+  <a href="https://kyns.ai">
+    <img src="https://img.shields.io/badge/Live%20Demo-kyns.ai-blueviolet?style=for-the-badge">
+  </a>
+  <a href="https://github.com/Kyns-ai/kyns/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge">
+  </a>
+  <a href="https://github.com/Kyns-ai/kyns/stargazers">
+    <img src="https://img.shields.io/github/stars/Kyns-ai/kyns?style=for-the-badge&color=yellow">
   </a>
 </p>
-
-
-# ✨ Features
-
-- 🖥️ **UI & Experience** inspired by ChatGPT with enhanced design and features
-
-- 🤖 **AI Model Selection**:  
-  - Anthropic (Claude), AWS Bedrock, OpenAI, Azure OpenAI, Google, Vertex AI, OpenAI Responses API (incl. Azure)
-  - [Custom Endpoints](https://www.librechat.ai/docs/quick_start/custom_endpoints): Use any OpenAI-compatible API with LibreChat, no proxy required
-  - Compatible with [Local & Remote AI Providers](https://www.librechat.ai/docs/configuration/librechat_yaml/ai_endpoints):
-    - Ollama, groq, Cohere, Mistral AI, Apple MLX, koboldcpp, together.ai,
-    - OpenRouter, Helicone, Perplexity, ShuttleAI, Deepseek, Qwen, and more
-
-- 🔧 **[Code Interpreter API](https://www.librechat.ai/docs/features/code_interpreter)**: 
-  - Secure, Sandboxed Execution in Python, Node.js (JS/TS), Go, C/C++, Java, PHP, Rust, and Fortran
-  - Seamless File Handling: Upload, process, and download files directly
-  - No Privacy Concerns: Fully isolated and secure execution
-
-- 🔦 **Agents & Tools Integration**:  
-  - **[LibreChat Agents](https://www.librechat.ai/docs/features/agents)**:
-    - No-Code Custom Assistants: Build specialized, AI-driven helpers
-    - Agent Marketplace: Discover and deploy community-built agents
-    - Collaborative Sharing: Share agents with specific users and groups
-    - Flexible & Extensible: Use MCP Servers, tools, file search, code execution, and more
-    - Compatible with Custom Endpoints, OpenAI, Azure, Anthropic, AWS Bedrock, Google, Vertex AI, Responses API, and more
-    - [Model Context Protocol (MCP) Support](https://modelcontextprotocol.io/clients#librechat) for Tools
-
-- 🔍 **Web Search**:  
-  - Search the internet and retrieve relevant information to enhance your AI context
-  - Combines search providers, content scrapers, and result rerankers for optimal results
-  - **Customizable Jina Reranking**: Configure custom Jina API URLs for reranking services
-  - **[Learn More →](https://www.librechat.ai/docs/features/web_search)**
-
-- 🪄 **Generative UI with Code Artifacts**:  
-  - [Code Artifacts](https://youtu.be/GfTj7O4gmd0?si=WJbdnemZpJzBrJo3) allow creation of React, HTML, and Mermaid diagrams directly in chat
-
-- 🎨 **Image Generation & Editing**
-  - Text-to-image and image-to-image with [GPT-Image-1](https://www.librechat.ai/docs/features/image_gen#1--openai-image-tools-recommended)
-  - Text-to-image with [DALL-E (3/2)](https://www.librechat.ai/docs/features/image_gen#2--dalle-legacy), [Stable Diffusion](https://www.librechat.ai/docs/features/image_gen#3--stable-diffusion-local), [Flux](https://www.librechat.ai/docs/features/image_gen#4--flux), or any [MCP server](https://www.librechat.ai/docs/features/image_gen#5--model-context-protocol-mcp)
-  - Produce stunning visuals from prompts or refine existing images with a single instruction
-
-- 💾 **Presets & Context Management**:  
-  - Create, Save, & Share Custom Presets  
-  - Switch between AI Endpoints and Presets mid-chat
-  - Edit, Resubmit, and Continue Messages with Conversation branching  
-  - Create and share prompts with specific users and groups
-  - [Fork Messages & Conversations](https://www.librechat.ai/docs/features/fork) for Advanced Context control
-
-- 💬 **Multimodal & File Interactions**:  
-  - Upload and analyze images with Claude 3, GPT-4.5, GPT-4o, o1, Llama-Vision, and Gemini 📸  
-  - Chat with Files using Custom Endpoints, OpenAI, Azure, Anthropic, AWS Bedrock, & Google 🗃️
-
-- 🌎 **Multilingual UI**:
-  - English, 中文 (简体), 中文 (繁體), العربية, Deutsch, Español, Français, Italiano
-  - Polski, Português (PT), Português (BR), Русский, 日本語, Svenska, 한국어, Tiếng Việt
-  - Türkçe, Nederlands, עברית, Català, Čeština, Dansk, Eesti, فارسی
-  - Suomi, Magyar, Հայերեն, Bahasa Indonesia, ქართული, Latviešu, ไทย, ئۇيغۇرچە
-
-- 🧠 **Reasoning UI**:  
-  - Dynamic Reasoning UI for Chain-of-Thought/Reasoning AI models like DeepSeek-R1
-
-- 🎨 **Customizable Interface**:  
-  - Customizable Dropdown & Interface that adapts to both power users and newcomers
-
-- 🌊 **[Resumable Streams](https://www.librechat.ai/docs/features/resumable_streams)**:  
-  - Never lose a response: AI responses automatically reconnect and resume if your connection drops
-  - Multi-Tab & Multi-Device Sync: Open the same chat in multiple tabs or pick up on another device
-  - Production-Ready: Works from single-server setups to horizontally scaled deployments with Redis
-
-- 🗣️ **Speech & Audio**:  
-  - Chat hands-free with Speech-to-Text and Text-to-Speech  
-  - Automatically send and play Audio  
-  - Supports OpenAI, Azure OpenAI, and Elevenlabs
-
-- 📥 **Import & Export Conversations**:  
-  - Import Conversations from LibreChat, ChatGPT, Chatbot UI  
-  - Export conversations as screenshots, markdown, text, json
-
-- 🔍 **Search & Discovery**:  
-  - Search all messages/conversations
-
-- 👥 **Multi-User & Secure Access**:
-  - Multi-User, Secure Authentication with OAuth2, LDAP, & Email Login Support
-  - Built-in Moderation, and Token spend tools
-
-- ⚙️ **Configuration & Deployment**:  
-  - Configure Proxy, Reverse Proxy, Docker, & many Deployment options  
-  - Use completely local or deploy on the cloud
-
-- 📖 **Open-Source & Community**:  
-  - Completely Open-Source & Built in Public  
-  - Community-driven development, support, and feedback
-
-[For a thorough review of our features, see our docs here](https://docs.librechat.ai/) 📚
-
-## 🪶 All-In-One AI Conversations with LibreChat
-
-LibreChat is a self-hosted AI chat platform that unifies all major AI providers in a single, privacy-focused interface.
-
-Beyond chat, LibreChat provides AI Agents, Model Context Protocol (MCP) support, Artifacts, Code Interpreter, custom actions, conversation search, and enterprise-ready multi-user authentication.
-
-Open source, actively developed, and built for anyone who values control over their AI infrastructure.
 
 ---
 
-## 🔧 Environment Variables
+## What is KYNS?
 
-Copy `.env.example` to `.env` and fill in the values. The full reference is available at [librechat.ai/docs/configuration/dotenv](https://www.librechat.ai/docs/configuration/dotenv).
+KYNS is an uncensored AI chat platform built for users who want direct, honest AI conversations without the usual corporate guardrails.
 
-Below are the variables most relevant to the **KYNS.ai** deployment.
+- **No filters, no moralizing** — ask anything, get a real answer
+- **Privacy-first** — conversations are automatically deleted after 24 hours
+- **AI memory** — the AI learns your preferences over time (you can disable this)
+- **Image generation** — generate images directly in chat
+- **Web search** — real-time information retrieval
+- **Role-play characters** — immersive AI personas
 
-### Server
+Built on top of [LibreChat](https://github.com/danny-avila/LibreChat) — see [NOTICE.md](NOTICE.md) for attribution.
+
+---
+
+## ✨ Features
+
+- 🤖 **Uncensored AI** — powered by fine-tuned open-source models
+- 🎨 **Image Generation** — FLUX-based high-quality image creation
+- 🔍 **Web Search** — SearXNG + Firecrawl integration
+- 🧠 **Persistent Memory** — remembers your preferences across sessions
+- 🔒 **Privacy-first** — 24h auto-deletion of conversations and images
+- 🎭 **AI Characters** — immersive role-play personas
+- 🗣️ **Voice (TTS/STT)** — Chatterbox TTS + Whisper STT
+- 📱 **Mobile-friendly** — responsive UI
+
+---
+
+## 🚀 Running Locally
+
+### Prerequisites
+
+- Node.js 20+ 
+- MongoDB 6+
+- Docker (optional)
+
+### Quick Start with Docker
+
+```bash
+git clone https://github.com/Kyns-ai/kyns.git
+cd kyns
+cp .env.example .env
+# Edit .env with your values
+docker compose up -d
+```
+
+Open `http://localhost:3080`
+
+### Generating Required Secrets
+
+```bash
+# CREDS_KEY (64 hex chars)
+openssl rand -hex 32
+
+# CREDS_IV (32 hex chars)  
+openssl rand -hex 16
+
+# JWT_SECRET
+openssl rand -hex 32
+
+# JWT_REFRESH_SECRET
+openssl rand -hex 32
+```
+
+---
+
+## 🔧 Configuration
+
+Copy `.env.example` to `.env` and fill in the required values:
 
 | Variable | Required | Description |
 |---|---|---|
-| `HOST` | Yes | Bind address (default: `localhost`) |
-| `PORT` | Yes | HTTP port (default: `3080`) |
 | `MONGO_URI` | Yes | MongoDB connection string |
-| `DOMAIN_CLIENT` | Yes | Public URL of the frontend |
-| `DOMAIN_SERVER` | Yes | Public URL of the backend |
-| `JWT_SECRET` | Yes | Secret used to sign access tokens |
-| `JWT_REFRESH_SECRET` | Yes | Secret used to sign refresh tokens |
-| `CREDS_KEY` | Yes | AES key for encrypting stored credentials |
-| `CREDS_IV` | Yes | AES IV for encrypting stored credentials |
+| `CREDS_KEY` | Yes | AES-256 key for encrypting credentials |
+| `CREDS_IV` | Yes | AES IV (16 bytes hex) |
+| `JWT_SECRET` | Yes | JWT signing secret |
+| `JWT_REFRESH_SECRET` | Yes | JWT refresh signing secret |
+| `OPENAI_API_KEY` | Yes | API key for your LLM provider |
+| `OPENAI_REVERSE_PROXY` | Yes | vLLM / OpenAI-compatible endpoint URL |
 
-### Logging & Debug
-
-| Variable | Production value | Description |
-|---|---|---|
-| `DEBUG_LOGGING` | `false` | Verbose backend logging |
-| `DEBUG_CONSOLE` | `false` | Log HTTP requests to stdout |
-| `DEBUG_OPENAI` | `false` | Log raw OpenAI API requests/responses |
-| `CONSOLE_JSON` | `false` | Emit logs as JSON (for GCP/AWS log agents) |
-
-### Registration & Login
-
-| Variable | Value | Description |
-|---|---|---|
-| `ALLOW_EMAIL_LOGIN` | `true` | Allow login with email + password |
-| `ALLOW_REGISTRATION` | `true` | Allow new user registration |
-| `ALLOW_UNVERIFIED_EMAIL_LOGIN` | `true` | Skip email verification requirement |
-| `ALLOW_ACCOUNT_DELETION` | `true` | Let users delete their own accounts |
-| `ALLOW_SOCIAL_LOGIN` | `false` | Disable OAuth social login |
-| `ALLOW_PASSWORD_RESET` | `false` | Disable self-serve password reset |
-
-### Search
-
-| Variable | Value | Description |
-|---|---|---|
-| `SEARCH` | `false` | Disable MeiliSearch conversation search (KYNS uses SearXNG for web search instead) |
-
-### AI Endpoint (vLLM / RunPod)
-
-| Variable | Required | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | Yes | Set to `user_provided` or your vLLM key |
-| `RUNPOD_API_KEY` | Yes | RunPod API key for pod management scripts |
-| `RUNPOD_POD_ID` | No | Pod ID for stop-pod script (first running pod used if omitted) |
-
-### KYNS Image Generation
-
-| Variable | Required | Description |
-|---|---|---|
-| `RUNPOD_IMAGE_ENDPOINT_ID` | Yes | RunPod serverless endpoint ID for image generation |
-| `RUNPOD_IMAGE_API_KEY` | No | Separate API key for image endpoint (falls back to `RUNPOD_API_KEY`) |
-| `IMAGE_PROXY_KEY` | No | Internal Bearer token for the image proxy route (default: `kyns-image-internal`) |
-
-### KYNS TTS (Chatterbox)
-
-| Variable | Required | Description |
-|---|---|---|
-| `TTS_BASE_URL` | Yes | URL of the Chatterbox TTS service (e.g. `https://kyns-tts.up.railway.app`) |
-| `TTS_API_KEY` | No | API key for the TTS service if auth is enabled |
-
-### Web Search (SearXNG + Firecrawl)
-
-| Variable | Required | Description |
-|---|---|---|
-| `SEARXNG_INSTANCE_URL` | Yes | URL of the self-hosted SearXNG instance |
-| `SEARXNG_SECRET_KEY` | No | Secret key configured in the SearXNG container |
-| `FIRECRAWL_API_KEY` | No | API key for the Firecrawl scraper service |
-| `FIRECRAWL_API_URL` | No | Custom Firecrawl API URL (defaults to Firecrawl cloud) |
-
-### Redis
-
-| Variable | Required | Description |
-|---|---|---|
-| `USE_REDIS` | No | Enable Redis for caching and session storage |
-| `REDIS_URI` | No | Redis connection URI (e.g. `redis://127.0.0.1:6379`) |
+For the full configuration reference, see [`librechat.example.yaml`](librechat.example.yaml) and [`.env.example`](.env.example).
 
 ---
 
-## 🌐 Resources
+## 🤝 Contributing
 
-**GitHub Repo:**
-  - **RAG API:** [github.com/danny-avila/rag_api](https://github.com/danny-avila/rag_api)
-  - **Website:** [github.com/LibreChat-AI/librechat.ai](https://github.com/LibreChat-AI/librechat.ai)
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Other:**
-  - **Website:** [librechat.ai](https://librechat.ai)
-  - **Documentation:** [librechat.ai/docs](https://librechat.ai/docs)
-  - **Blog:** [librechat.ai/blog](https://librechat.ai/blog)
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Commit your changes
+4. Open a Pull Request
 
 ---
 
-## 📝 Changelog
+## 🔒 Security
 
-Keep up with the latest updates by visiting the releases page and notes:
-- [Releases](https://github.com/danny-avila/LibreChat/releases)
-- [Changelog](https://www.librechat.ai/changelog) 
+Found a vulnerability? See [SECURITY.md](SECURITY.md) for responsible disclosure.
 
-**⚠️ Please consult the [changelog](https://www.librechat.ai/changelog) for breaking changes before updating.**
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE).
+
+KYNS™ is a trademark. Forks must remove KYNS branding. See [NOTICE.md](NOTICE.md).
 
 ---
 
 ## ⭐ Star History
 
-<p align="center">
-  <a href="https://star-history.com/#danny-avila/LibreChat&Date">
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=danny-avila/LibreChat&type=Date&theme=dark" onerror="this.src='https://api.star-history.com/svg?repos=danny-avila/LibreChat&type=Date'" />
-  </a>
-</p>
-<p align="center">
-  <a href="https://trendshift.io/repositories/4685" target="_blank" style="padding: 10px;">
-    <img src="https://trendshift.io/api/badge/repositories/4685" alt="danny-avila%2FLibreChat | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
-  </a>
-  <a href="https://runacap.com/ross-index/q1-24/" target="_blank" rel="noopener" style="margin-left: 20px;">
-    <img style="width: 260px; height: 56px" src="https://runacap.com/wp-content/uploads/2024/04/ROSS_badge_white_Q1_2024.svg" alt="ROSS Index - Fastest Growing Open-Source Startups in Q1 2024 | Runa Capital" width="260" height="56"/>
-  </a>
-</p>
+[![Star History Chart](https://api.star-history.com/svg?repos=Kyns-ai/kyns&type=Date)](https://star-history.com/#Kyns-ai/kyns&Date)
 
 ---
 
-## ✨ Contributions
-
-Contributions, suggestions, bug reports and fixes are welcome!
-
-For new features, components, or extensions, please open an issue and discuss before sending a PR.
-
-If you'd like to help translate LibreChat into your language, we'd love your contribution! Improving our translations not only makes LibreChat more accessible to users around the world but also enhances the overall user experience. Please check out our [Translation Guide](https://www.librechat.ai/docs/translation).
-
----
-
-## 💖 This project exists in its current state thanks to all the people who contribute
-
-<a href="https://github.com/danny-avila/LibreChat/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=danny-avila/LibreChat" />
-</a>
-
----
-
-## 🎉 Special Thanks
-
-We thank [Locize](https://locize.com) for their translation management tools that support multiple languages in LibreChat.
-
-<p align="center">
-  <a href="https://locize.com" target="_blank" rel="noopener noreferrer">
-    <img src="https://github.com/user-attachments/assets/d6b70894-6064-475e-bb65-92a9e23e0077" alt="Locize Logo" height="50">
-  </a>
-</p>
+Built on [LibreChat](https://github.com/danny-avila/LibreChat) © 2023 Danny Avila — MIT License.
