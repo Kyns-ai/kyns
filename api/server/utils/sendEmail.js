@@ -93,11 +93,38 @@ const sendEmailViaSMTP = async ({ transporterOptions, mailOptions }) => {
  *
  * @throws Will throw an error if the email sending process fails and throwError is `true`.
  */
+const htmlToPlainText = (html) =>
+  html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:p|div|tr|li|h[1-6]|blockquote)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const buildListUnsubscribeHeaders = (fromEmail) => {
+  const unsubEmail = process.env.EMAIL_REPLY_TO || fromEmail;
+  return {
+    'List-Unsubscribe': `<mailto:${unsubEmail}?subject=unsubscribe>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  };
+};
+
 const sendEmail = async ({ email, subject, payload, template, throwError = true }) => {
   try {
     const { content: source } = await readFileAsString(path.join(__dirname, 'emails', template));
     const compiledTemplate = handlebars.compile(source);
     const html = compiledTemplate(payload);
+    const text = htmlToPlainText(html);
 
     // Prepare common email data
     const fromName = process.env.EMAIL_FROM_NAME || process.env.APP_TITLE;
@@ -106,6 +133,7 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
     const toAddress = `"${payload.name}" <${email}>`;
     const replyToEmail = process.env.EMAIL_REPLY_TO;
     const replyToAddress = replyToEmail ? `"${fromName}" <${replyToEmail}>` : undefined;
+    const unsubscribeHeaders = buildListUnsubscribeHeaders(fromEmail);
 
     // Check if Mailgun is configured
     if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {
@@ -124,7 +152,7 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
     const transporterOptions = {
       // Use STARTTLS by default instead of obligatory TLS
       secure: process.env.EMAIL_ENCRYPTION === 'tls',
-      // If explicit STARTTLS is set, require it when connecting
+      // If explicit STARTTLS is set, require it when connections
       requireTls: process.env.EMAIL_ENCRYPTION === 'starttls',
       tls: {
         // Whether to accept unsigned certificates
@@ -155,12 +183,13 @@ const sendEmail = async ({ email, subject, payload, template, throwError = true 
       to: toAddress,
       envelope: {
         // Envelope from should contain addr-spec
-        // Mistake in the Nodemailer documentation?
         from: fromEmail,
         to: email,
       },
       subject: subject,
       html: html,
+      text: text,
+      headers: unsubscribeHeaders,
     };
     if (replyToAddress) {
       mailOptions.replyTo = replyToAddress;
