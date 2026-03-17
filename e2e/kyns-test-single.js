@@ -15,8 +15,15 @@ function httpReq(url, opts, body) {
 }
 
 async function test() {
-  const loginData = JSON.stringify({ email: 'kyns.e2e.test@kyns.ai', password: 'KynsTest2026!' });
-  const loginResp = await httpReq('https://chat.kyns.ai/api/auth/login', {
+  const email = process.env.KYNS_TEST_EMAIL;
+  const password = process.env.KYNS_TEST_PASSWORD;
+  const baseUrl = process.env.KYNS_BASE_URL || 'http://localhost:3080';
+  if (!email || !password) {
+    console.error('Error: KYNS_TEST_EMAIL and KYNS_TEST_PASSWORD environment variables are required.');
+    process.exit(1);
+  }
+  const loginData = JSON.stringify({ email, password });
+  const loginResp = await httpReq(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(loginData), 'User-Agent': UA },
   }, loginData);

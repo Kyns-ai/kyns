@@ -21,8 +21,14 @@ const LOOP_INTERRUPTED_TEXT = 'A resposta entrou em loop e foi interrompida. Ten
 const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
 const DEFAULT_APP_BASE_URL =
   process.env.KYNS_EVAL_APP_BASE_URL || process.env.LIBRECHAT_BASE_URL || 'https://chat.kyns.ai';
-const DEFAULT_APP_EMAIL = process.env.KYNS_TEST_EMAIL || 'kyns.e2e.test@kyns.ai';
-const DEFAULT_APP_PASSWORD = process.env.KYNS_TEST_PASSWORD || 'KynsTest2026!';
+const DEFAULT_APP_EMAIL = process.env.KYNS_TEST_EMAIL;
+const DEFAULT_APP_PASSWORD = process.env.KYNS_TEST_PASSWORD;
+
+if (!DEFAULT_APP_EMAIL || !DEFAULT_APP_PASSWORD) {
+  console.error('Error: KYNS_TEST_EMAIL and KYNS_TEST_PASSWORD environment variables are required.');
+  console.error('Copy e2e/.env.e2e.example to e2e/.env.e2e and fill in your credentials.');
+  process.exit(1);
+}
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const DEFAULT_TIMEOUTS_MS = {

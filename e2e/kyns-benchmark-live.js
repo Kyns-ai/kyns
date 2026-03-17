@@ -6,9 +6,15 @@
 const https = require('https');
 const http = require('http');
 
-const BASE = 'https://chat.kyns.ai';
-const EMAIL = 'kyns.e2e.test@kyns.ai';
-const PASSWORD = 'KynsTest2026!';
+const BASE = process.env.KYNS_BASE_URL || 'http://localhost:3080';
+const EMAIL = process.env.KYNS_TEST_EMAIL;
+const PASSWORD = process.env.KYNS_TEST_PASSWORD;
+
+if (!EMAIL || !PASSWORD) {
+  console.error('Error: KYNS_TEST_EMAIL and KYNS_TEST_PASSWORD environment variables are required.');
+  console.error('Copy e2e/.env.e2e.example to e2e/.env.e2e and fill in your credentials.');
+  process.exit(1);
+}
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 const NORMAL_PROMPTS = [
