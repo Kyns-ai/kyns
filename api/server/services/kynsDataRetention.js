@@ -8,23 +8,31 @@ const RETENTION_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = 60 * 60 * 1000;
 
 async function purgeExpiredMessages() {
-  const expiredConvos = await Conversation.find(
-    { expiredAt: { $ne: null } },
-    { conversationId: 1 },
-  ).lean();
+  const batchSize = 500;
+  let totalModified = 0;
+  let hasMore = true;
 
-  if (expiredConvos.length === 0) {
-    return;
+  while (hasMore) {
+    const expiredConvoIds = await Conversation.distinct('conversationId', {
+      expiredAt: { $ne: null },
+    });
+
+    if (expiredConvoIds.length === 0) {
+      break;
+    }
+
+    const batch = expiredConvoIds.slice(0, batchSize);
+    const result = await Message.updateMany(
+      { expiredAt: null, conversationId: { $in: batch } },
+      { $set: { expiredAt: new Date() } },
+    );
+
+    totalModified += result.modifiedCount;
+    hasMore = expiredConvoIds.length > batchSize;
   }
 
-  const expiredConvoIds = expiredConvos.map((c) => c.conversationId);
-  const result = await Message.updateMany(
-    { expiredAt: null, conversationId: { $in: expiredConvoIds } },
-    { $set: { expiredAt: new Date() } },
-  );
-
-  if (result.modifiedCount > 0) {
-    logger.info(`[kynsDataRetention] Marked ${result.modifiedCount} messages as expired`);
+  if (totalModified > 0) {
+    logger.info(`[kynsDataRetention] Marked ${totalModified} messages as expired`);
   }
 }
 

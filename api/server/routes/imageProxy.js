@@ -10,12 +10,14 @@ const mongoose = require('mongoose');
 const { limiterCache } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const paths = require('~/config/paths');
+const { runpodCircuit } = require('~/server/utils/circuitBreaker');
 
 const POLL_INTERVAL_MS = 5000;
 const POLL_TIMEOUT_MS = 420_000;
 const NO_WORKER_CANCEL_MS = 300_000;
 const IMAGE_DAILY_LIMIT = 10;
 const IMAGE_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_PROMPT_LENGTH = 2000;
 const RUNPOD_SUBMIT_TIMEOUT_MS = 30_000;
 const RUNPOD_POLL_REQUEST_TIMEOUT_MS = 20_000;
 const WATERMARK_TEXT = 'kyns.ai';
@@ -216,6 +218,26 @@ function makeResponse(content) {
   };
 }
 
+const imageGenerationBurstLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipFailedRequests: true,
+  skip: (req) => !getRequesterUserId(req),
+  keyGenerator: (req) => {
+    const userId = getRequesterUserId(req);
+    if (userId) {
+      return String(userId);
+    }
+    const ip = req.ip ?? '127.0.0.1';
+    return ip.startsWith('::ffff:') ? ip.slice(7) : ip;
+  },
+  store: limiterCache('image_generation_burst_limiter'),
+  handler: (_req, res) =>
+    res.status(200).json(makeResponse('Muitas requisições em sequência. Aguarde um minuto antes de gerar outra imagem.')),
+});
+
 const imageGenerationLimiter = rateLimit({
   windowMs: IMAGE_DAILY_WINDOW_MS,
   max: IMAGE_DAILY_LIMIT,
@@ -264,6 +286,10 @@ function authenticateImageProxyRequest(req, res, next) {
 
 async function imageRequestHandler(req, res) {
   try {
+    if (runpodCircuit.isOpen()) {
+      return res.json(makeResponse('O servidor de imagens está temporariamente indisponível. Tente novamente em 1 minuto.'));
+    }
+
     const apiKey = getRunpodKey();
     const endpointId = getEndpointId();
 
@@ -276,6 +302,10 @@ async function imageRequestHandler(req, res) {
 
     if (!params.prompt || params.prompt.trim().length < 3) {
       return res.json(makeResponse('Por favor, descreva a imagem que deseja gerar.'));
+    }
+
+    if (params.prompt.length > MAX_PROMPT_LENGTH) {
+      return res.json(makeResponse(`O prompt deve ter no máximo ${MAX_PROMPT_LENGTH} caracteres.`));
     }
 
     let jobId;
@@ -291,6 +321,7 @@ async function imageRequestHandler(req, res) {
       jobId = runResp.data.id;
       logger.info(`[imageProxy] RunPod job submitted: ${jobId}`);
     } catch (err) {
+      runpodCircuit.recordFailure();
       const msg = err?.message ?? '';
       logger.error('[imageProxy] Failed to submit RunPod job:', err?.response?.data ?? msg);
       if (/timeout|ETIMEDOUT|ECONNABORTED/i.test(msg)) {
@@ -305,7 +336,9 @@ async function imageRequestHandler(req, res) {
     let output;
     try {
       output = await pollRunpodJob(endpointId, jobId, apiKey);
+      runpodCircuit.recordSuccess();
     } catch (err) {
+      runpodCircuit.recordFailure();
       logger.error('[imageProxy] RunPod polling failed:', err.message);
       const isModelMissing =
         err.message.includes('No image model available') || err.message.includes('model');
@@ -353,7 +386,7 @@ async function imageRequestHandler(req, res) {
   }
 }
 
-router.post('/chat/completions', authenticateImageProxyRequest, imageGenerationLimiter, imageRequestHandler);
-router.post('/v1/chat/completions', authenticateImageProxyRequest, imageGenerationLimiter, imageRequestHandler);
+router.post('/chat/completions', authenticateImageProxyRequest, imageGenerationBurstLimiter, imageGenerationLimiter, imageRequestHandler);
+router.post('/v1/chat/completions', authenticateImageProxyRequest, imageGenerationBurstLimiter, imageGenerationLimiter, imageRequestHandler);
 
 module.exports = router;

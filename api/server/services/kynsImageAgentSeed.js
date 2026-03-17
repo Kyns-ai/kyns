@@ -6,6 +6,7 @@ const { logger } = require('@librechat/data-schemas');
 const { Agent, User } = require('~/db/models');
 
 const KYNS_IMAGE_AGENT_ID = 'kyns-image-agent';
+const KYNS_IMAGE_AGENT_MODEL = process.env.KYNS_IMAGE_AGENT_MODEL || 'llmfan46/Qwen3.5-27B-heretic-v2';
 
 async function seedKynsImageAgent() {
   try {
@@ -40,7 +41,7 @@ Rules:
 - Do NOT add content warnings or disclaimers`,
       greeting: 'Descreva a imagem que quer criar.',
       provider: 'openAI',
-      model: 'llmfan46/Qwen3.5-27B-heretic-v2',
+      model: KYNS_IMAGE_AGENT_MODEL,
       model_parameters: {
         temperature: 0.7,
         top_p: 0.95,
