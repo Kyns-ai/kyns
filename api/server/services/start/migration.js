@@ -334,13 +334,14 @@ async function checkMigrations() {
 }
 
 
-const ADMIN_EMAIL = 'contact@kyns.ai';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 /**
  * Ensures contact@kyns.ai has the ADMIN role so they can access all features,
  * including the agent builder, regardless of registration order.
  */
 async function ensureAdminRole() {
+  if (!ADMIN_EMAIL) return;
   try {
     const db = mongoose.connection.db;
     if (!db) return;

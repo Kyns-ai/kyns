@@ -215,4 +215,5 @@ docs/AGENT_SCHEMA_*.md
 docs/SEED_AGENTS_*.md
 docs/UNBAN_*.md
 docs/RATE_LIMITS.md
+config/apply-final-update.js
 .tmp-librechat-logs*.txt

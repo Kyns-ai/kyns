@@ -4,17 +4,18 @@
  */
 const { MongoClient } = require('mongodb');
 
+// Replace with your own ElevenLabs voice IDs from https://elevenlabs.io/app/voice-library
 const VOICE_MAP = {
-  'Luna': 'cgSgspJ2msm6clMCkdW9',
-  'Marina': 'FGY2WhTYpPnrIDTdsKH5',
-  'Ísis': 'EXAVITQu4vr4xnSDxMaL',
-  'Nala': 'hpp4J3VqNfWAUOO0d1Us',
-  'Oráculo': 'pFZP5JQG7iQjIQuC4Bku',
-  'Viktor': 'pNInz6obpgDQGcFmaJgB',
-  'Dante': 'iP95p4xoKVk53GoZ742B',
-  'Gojo Satoru': 'IKne3meq5aSn9XLyUdCD',
-  'O Mestre': 'JBFqnCBsd6RMkjVDRZzb',
-  'Dr. Mente': 'nPczCjzI2devNBz1zQrb',
+  'Luna': process.env.VOICE_ID_LUNA || '',
+  'Marina': process.env.VOICE_ID_MARINA || '',
+  'Ísis': process.env.VOICE_ID_ISIS || '',
+  'Nala': process.env.VOICE_ID_NALA || '',
+  'Oráculo': process.env.VOICE_ID_ORACULO || '',
+  'Viktor': process.env.VOICE_ID_VIKTOR || '',
+  'Dante': process.env.VOICE_ID_DANTE || '',
+  'Gojo Satoru': process.env.VOICE_ID_GOJO || '',
+  'O Mestre': process.env.VOICE_ID_MESTRE || '',
+  'Dr. Mente': process.env.VOICE_ID_DRMENTE || '',
 };
 
 async function main() {

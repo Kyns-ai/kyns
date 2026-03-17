@@ -16,7 +16,8 @@ function loadSharp() {
 
 const sharp = loadSharp();
 
-const ENDPOINT_ID = process.env.RUNPOD_IMAGE_ENDPOINT_ID || 'c6t2y6a1q124re';
+const ENDPOINT_ID = process.env.RUNPOD_IMAGE_ENDPOINT_ID;
+if (!ENDPOINT_ID) { console.error('RUNPOD_IMAGE_ENDPOINT_ID env var is required'); process.exit(1); }
 const API_KEY = process.env.RUNPOD_IMAGE_API_KEY || process.env.RUNPOD_API_KEY || '';
 const OUTPUT_DIR = path.resolve(__dirname, 'kyns-agent-avatars');
 const TARGET_SIZE = 512;
