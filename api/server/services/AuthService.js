@@ -298,6 +298,14 @@ const registerUser = async (user, additionalData = {}) => {
 
     const emailEnabled = checkEmailConfig();
     const disableTTL = isEnabled(process.env.ALLOW_UNVERIFIED_EMAIL_LOGIN);
+    const testDomains = (process.env.TEST_EMAIL_DOMAINS ?? '')
+      .split(',')
+      .map((d) => d.trim().toLowerCase())
+      .filter(Boolean);
+    const emailDomain = email.split('@')[1]?.toLowerCase() ?? '';
+    if (testDomains.length > 0 && testDomains.includes(emailDomain)) {
+      newUserData.emailVerified = true;
+    }
     const shouldSendVerificationEmail = emailEnabled && !newUserData.emailVerified;
     const initialBalanceConfig = shouldSendVerificationEmail
       ? undefined

@@ -44,6 +44,9 @@ const banResponse = async (req, res) => {
  *
  * @returns {Promise<function|Object>} - Returns a Promise which when resolved calls next middleware if user or source IP is not banned. Otherwise calls `banResponse()` and sets ban details in `banCache`.
  */
+const getBypassIPs = () =>
+  (process.env.BYPASS_BAN_IPS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+
 const checkBan = async (req, res, next = () => {}) => {
   try {
     const { BAN_VIOLATIONS } = process.env ?? {};
@@ -53,6 +56,14 @@ const checkBan = async (req, res, next = () => {}) => {
     }
 
     req.ip = removePorts(req);
+
+    if (getBypassIPs().includes(req.ip)) {
+      return next();
+    }
+
+    if (req.user?.role === 'ADMIN') {
+      return next();
+    }
     let userId = req.user?.id ?? req.user?._id ?? null;
 
     if (!userId && req?.body?.email) {

@@ -13,9 +13,16 @@ const banViolation = require('./banViolation');
  * @param {Object} errorMessage - The error message to log.
  * @param {number | string} [score=1] - The severity of the violation. Defaults to 1
  */
+const getBypassIPs = () =>
+  (process.env.BYPASS_BAN_IPS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+
 const logViolation = async (req, res, type, errorMessage, score = 1) => {
   const userId = req.user?.id ?? req.user?._id;
   if (!userId) {
+    return;
+  }
+
+  if (req.ip && getBypassIPs().includes(req.ip)) {
     return;
   }
   const logs = getLogStores(ViolationTypes.GENERAL);
