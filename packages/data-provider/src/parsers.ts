@@ -1,0 +1,1016 @@
+import dayjs from 'dayjs';
+import type { ZodIssue } from 'zod';
+import type * as a from './types/assistants';
+import type * as s from './schemas';
+import type * as t from './types';
+import { ContentTypes } from './types/runs';
+import {
+  openAISchema,
+  googleSchema,
+  EModelEndpoint,
+  anthropicSchema,
+  assistantSchema,
+  // agentsSchema,
+  compactAgentsSchema,
+  compactGoogleSchema,
+  compactAssistantSchema,
+} from './schemas';
+import { bedrockInputSchema } from './bedrock';
+import { alternateName } from './config';
+
+type EndpointSchema =
+  | typeof openAISchema
+  | typeof googleSchema
+  | typeof anthropicSchema
+  | typeof assistantSchema
+  | typeof compactAgentsSchema
+  | typeof bedrockInputSchema;
+
+export type EndpointSchemaKey = EModelEndpoint;
+
+const endpointSchemas: Record<EndpointSchemaKey, EndpointSchema> = {
+  [EModelEndpoint.openAI]: openAISchema,
+  [EModelEndpoint.azureOpenAI]: openAISchema,
+  [EModelEndpoint.custom]: openAISchema,
+  [EModelEndpoint.google]: googleSchema,
+  [EModelEndpoint.anthropic]: anthropicSchema,
+  [EModelEndpoint.assistants]: assistantSchema,
+  [EModelEndpoint.azureAssistants]: assistantSchema,
+  [EModelEndpoint.agents]: compactAgentsSchema,
+  [EModelEndpoint.bedrock]: bedrockInputSchema,
+};
+
+// const schemaCreators: Record<EModelEndpoint, (customSchema: DefaultSchemaValues) => EndpointSchema> = {
+//   [EModelEndpoint.google]: createGoogleSchema,
+// };
+
+/** Get the enabled endpoints from the `ENDPOINTS` environment variable */
+export function getEnabledEndpoints() {
+  const defaultEndpoints: string[] = [
+    EModelEndpoint.openAI,
+    EModelEndpoint.agents,
+    EModelEndpoint.assistants,
+    EModelEndpoint.azureAssistants,
+    EModelEndpoint.azureOpenAI,
+    EModelEndpoint.google,
+    EModelEndpoint.anthropic,
+    EModelEndpoint.bedrock,
+  ];
+
+  const endpointsEnv = process.env.ENDPOINTS ?? '';
+  let enabledEndpoints = defaultEndpoints;
+  if (endpointsEnv) {
+    enabledEndpoints = endpointsEnv
+      .split(',')
+      .filter((endpoint) => endpoint.trim())
+      .map((endpoint) => endpoint.trim());
+  }
+  return enabledEndpoints;
+}
+
+/** Orders an existing EndpointsConfig object based on enabled endpoint/custom ordering */
+export function orderEndpointsConfig(endpointsConfig: t.TEndpointsConfig) {
+  if (!endpointsConfig) {
+    return {};
+  }
+  const enabledEndpoints = getEnabledEndpoints();
+  const endpointKeys = Object.keys(endpointsConfig);
+  const defaultCustomIndex = enabledEndpoints.indexOf(EModelEndpoint.custom);
+  return endpointKeys.reduce(
+    (accumulatedConfig: Record<string, t.TConfig | null | undefined>, currentEndpointKey) => {
+      const isCustom = !(currentEndpointKey in EModelEndpoint);
+      const isEnabled = enabledEndpoints.includes(currentEndpointKey);
+      if (!isEnabled && !isCustom) {
+        return accumulatedConfig;
+      }
+
+      const index = enabledEndpoints.indexOf(currentEndpointKey);
+
+      if (isCustom) {
+        accumulatedConfig[currentEndpointKey] = {
+          order: defaultCustomIndex >= 0 ? defaultCustomIndex : 9999,
+          ...(endpointsConfig[currentEndpointKey] as Omit<t.TConfig, 'order'> & { order?: number }),
+        };
+      } else if (endpointsConfig[currentEndpointKey]) {
+        accumulatedConfig[currentEndpointKey] = {
+          ...endpointsConfig[currentEndpointKey],
+          order: index,
+        };
+      }
+      return accumulatedConfig;
+    },
+    {},
+  );
+}
+
+/** Converts an array of Zod issues into a string. */
+export function errorsToString(errors: ZodIssue[]) {
+  return errors
+    .map((error) => {
+      const field = error.path.join('.');
+      const message = error.message;
+
+      return `${field}: ${message}`;
+    })
+    .join(' ');
+}
+
+export function getFirstDefinedValue(possibleValues: string[]) {
+  let returnValue;
+  for (const value of possibleValues) {
+    if (value) {
+      returnValue = value;
+      break;
+    }
+  }
+  return returnValue;
+}
+
+export function getNonEmptyValue(possibleValues: string[]) {
+  for (const value of possibleValues) {
+    if (value && value.trim() !== '') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+export type TPossibleValues = {
+  models: string[];
+};
+
+export const parseConvo = ({
+  endpoint,
+  endpointType,
+  conversation,
+  possibleValues,
+  defaultParamsEndpoint,
+}: {
+  endpoint: EndpointSchemaKey;
+  endpointType?: EndpointSchemaKey | null;
+  conversation: Partial<s.TConversation | s.TPreset> | null;
+  possibleValues?: TPossibleValues;
+  defaultParamsEndpoint?: string | null;
+}) => {
+  let schema = endpointSchemas[endpoint] as EndpointSchema | undefined;
+
+  if (!schema && !endpointType) {
+    throw new Error(`Unknown endpoint: ${endpoint}`);
+  } else if (!schema) {
+    const overrideSchema = defaultParamsEndpoint
+      ? endpointSchemas[defaultParamsEndpoint as EndpointSchemaKey]
+      : undefined;
+    schema = overrideSchema ?? (endpointType ? endpointSchemas[endpointType] : undefined);
+  }
+
+  const convo = schema?.parse(conversation) as s.TConversation | undefined;
+  const { models } = possibleValues ?? {};
+
+  if (models && convo) {
+    convo.model = getFirstDefinedValue(models) ?? convo.model;
+  }
+
+  return convo;
+};
+
+/** Match GPT followed by digit, optional decimal, and optional suffix
+ *
+ * Examples: gpt-4, gpt-4o, gpt-4.5, gpt-5a, etc. */
+const extractGPTVersion = (modelStr: string): string => {
+  const gptMatch = modelStr.match(/gpt-(\d+(?:\.\d+)?)([a-z])?/i);
+  if (gptMatch) {
+    const version = gptMatch[1];
+    const suffix = gptMatch[2] || '';
+    return `GPT-${version}${suffix}`;
+  }
+  return '';
+};
+
+/** Match omni models (o1, o3, etc.), "o" followed by a digit, possibly with decimal */
+const extractOmniVersion = (modelStr: string): string => {
+  const omniMatch = modelStr.match(/\bo(\d+(?:\.\d+)?)\b/i);
+  if (omniMatch) {
+    const version = omniMatch[1];
+    return `o${version}`;
+  }
+  return '';
+};
+
+export const getResponseSender = (endpointOption: Partial<t.TEndpointOption>): string => {
+  const {
+    model: _m,
+    endpoint: _e,
+    endpointType,
+    modelDisplayLabel: _mdl,
+    chatGptLabel: _cgl,
+    modelLabel: _ml,
+  } = endpointOption;
+
+  const endpoint = _e as EModelEndpoint;
+
+  const model = _m ?? '';
+  const modelDisplayLabel = _mdl ?? '';
+  const chatGptLabel = _cgl ?? '';
+  const modelLabel = _ml ?? '';
+  if (
+    [EModelEndpoint.openAI, EModelEndpoint.bedrock, EModelEndpoint.azureOpenAI].includes(endpoint)
+  ) {
+    if (modelLabel) {
+      return modelLabel;
+    } else if (chatGptLabel) {
+      // @deprecated - prefer modelLabel
+      return chatGptLabel;
+    } else if (model && extractOmniVersion(model)) {
+      return extractOmniVersion(model);
+    } else if (model && (model.includes('mistral') || model.includes('codestral'))) {
+      return 'Mistral';
+    } else if (model && model.includes('deepseek')) {
+      return 'Deepseek';
+    } else if (model && model.includes('kimi')) {
+      return 'Kimi';
+    } else if (model && model.includes('moonshot')) {
+      return 'Moonshot';
+    } else if (model && model.includes('gpt-')) {
+      const gptVersion = extractGPTVersion(model);
+      return gptVersion || 'GPT';
+    }
+    return (alternateName[endpoint] as string | undefined) ?? 'AI';
+  }
+
+  if (endpoint === EModelEndpoint.anthropic) {
+    return modelLabel || 'Claude';
+  }
+
+  if (endpoint === EModelEndpoint.bedrock) {
+    return modelLabel || alternateName[endpoint];
+  }
+
+  if (endpoint === EModelEndpoint.google) {
+    if (modelLabel) {
+      return modelLabel;
+    } else if (model?.toLowerCase().includes('gemma') === true) {
+      return 'Gemma';
+    }
+
+    return 'Gemini';
+  }
+
+  if (endpoint === EModelEndpoint.custom || endpointType === EModelEndpoint.custom) {
+    if (modelLabel) {
+      return modelLabel;
+    } else if (chatGptLabel) {
+      // @deprecated - prefer modelLabel
+      return chatGptLabel;
+    } else if (model && extractOmniVersion(model)) {
+      return extractOmniVersion(model);
+    } else if (model && (model.includes('mistral') || model.includes('codestral'))) {
+      return 'Mistral';
+    } else if (model && model.includes('deepseek')) {
+      return 'Deepseek';
+    } else if (model && model.includes('kimi')) {
+      return 'Kimi';
+    } else if (model && model.includes('moonshot')) {
+      return 'Moonshot';
+    } else if (model && model.includes('gpt-')) {
+      const gptVersion = extractGPTVersion(model);
+      return gptVersion || 'GPT';
+    } else if (modelDisplayLabel) {
+      return modelDisplayLabel;
+    }
+
+    return 'AI';
+  }
+
+  return '';
+};
+
+type CompactEndpointSchema =
+  | typeof openAISchema
+  | typeof compactAssistantSchema
+  | typeof compactAgentsSchema
+  | typeof compactGoogleSchema
+  | typeof anthropicSchema
+  | typeof bedrockInputSchema;
+
+const compactEndpointSchemas: Record<EndpointSchemaKey, CompactEndpointSchema> = {
+  [EModelEndpoint.openAI]: openAISchema,
+  [EModelEndpoint.azureOpenAI]: openAISchema,
+  [EModelEndpoint.custom]: openAISchema,
+  [EModelEndpoint.assistants]: compactAssistantSchema,
+  [EModelEndpoint.azureAssistants]: compactAssistantSchema,
+  [EModelEndpoint.agents]: compactAgentsSchema,
+  [EModelEndpoint.google]: compactGoogleSchema,
+  [EModelEndpoint.bedrock]: bedrockInputSchema,
+  [EModelEndpoint.anthropic]: anthropicSchema,
+};
+
+export const parseCompactConvo = ({
+  endpoint,
+  endpointType,
+  conversation,
+  possibleValues,
+  defaultParamsEndpoint,
+}: {
+  endpoint?: EndpointSchemaKey;
+  endpointType?: EndpointSchemaKey | null;
+  conversation: Partial<s.TConversation | s.TPreset>;
+  possibleValues?: TPossibleValues;
+  defaultParamsEndpoint?: string | null;
+}): Omit<s.TConversation, 'iconURL'> | null => {
+  if (!endpoint) {
+    throw new Error(`undefined endpoint: ${endpoint}`);
+  }
+
+  let schema = compactEndpointSchemas[endpoint] as CompactEndpointSchema | undefined;
+
+  if (!schema && !endpointType) {
+    throw new Error(`Unknown endpoint: ${endpoint}`);
+  } else if (!schema) {
+    const overrideSchema = defaultParamsEndpoint
+      ? compactEndpointSchemas[defaultParamsEndpoint as EndpointSchemaKey]
+      : undefined;
+    schema = overrideSchema ?? (endpointType ? compactEndpointSchemas[endpointType] : undefined);
+  }
+
+  if (!schema) {
+    throw new Error(`Unknown endpointType: ${endpointType}`);
+  }
+
+  // Strip iconURL from input before parsing - it should only be derived server-side
+  // from model spec configuration, not accepted from client requests
+  const { iconURL: _clientIconURL, ...conversationWithoutIconURL } = conversation;
+
+  const convo = schema.parse(conversationWithoutIconURL) as s.TConversation | null;
+  const { models } = possibleValues ?? {};
+
+  if (models && convo) {
+    convo.model = getFirstDefinedValue(models) ?? convo.model;
+  }
+
+  return convo;
+};
+
+export type TExtractedThinkingSegment = {
+  type: 'text' | 'think';
+  content: string;
+};
+
+const taggedThinkingPatterns = [/:::thinking\s*([\s\S]*?):::/gi, /<think>\s*([\s\S]*?)\s*<\/think>/gi];
+const markdownHeadingPrefix = String.raw`(?:\s{0,3}#{1,6}\s*)?`;
+const markdownEmphasisWrapper = String.raw`(?:\*\*|__|[*_])?`;
+const thinkingHeadingLabel = String.raw`(thinking process|thought process|reasoning process|thinking|reasoning|processo de pensamento|processo de racioc[ií]nio|pensamento|racioc[ií]nio)`;
+const answerHeadingLabel = String.raw`(final answer|answer|response|result|output|resposta final|resposta|resultado|conclus[aã]o)`;
+const leadingThinkingPattern = new RegExp(
+  String.raw`^${markdownHeadingPrefix}${markdownEmphasisWrapper}${thinkingHeadingLabel}(?::)?${markdownEmphasisWrapper}\s*:?[ \t]*\n?`,
+  'i',
+);
+const answerHeadingPattern = new RegExp(
+  String.raw`(?:^|\n{2,}|\n)${markdownHeadingPrefix}${markdownEmphasisWrapper}${answerHeadingLabel}(?::)?${markdownEmphasisWrapper}\s*:?[ \t]*\n?`,
+  'i',
+);
+
+const inlineReasoningBlockPattern =
+  /^(?:Wait,|Better version|Better option|Hmm\s|Actually,|Let me reconsider|per guidelines|strict adherence|reading comprehension|based purely upon|settle this one|final decision point)/i;
+
+const fillerWordPattern =
+  /^(?:respectively|accordingly|henceforth|thusly|therefore|consequently|subsequently|thereafter|afterwards|eventually|finally|ultimately|lastly|chiefly|mainly|mostly|primarily|predominantly|principally|especially|particularly|notably|remarkably|significantly|importantly|seriously|profoundly|deeply|intensely|greatly|highly|extremely|exceedingly|exceptionally|extraordinarily|super|ultra|mega|hyper|turbo|power|boost|enhanced|amplified|reinforced|strengthened|fortified|bolstered|secured|protected|defended|guarded|shielded|armored|plated|coated|wrapped|covered|concealed|hidden|masked|disguised|camouflaged|obscured|veiled|shrouded|cloaked|enshrouded|enveloped|encased|enclosed|imprisoned|confined|restricted|limited|constrained|bound|tethered|linked|connected|joined|attached|fastened|fixed|set|placed|put|positioned|located|stationed|posted|assigned|allocated|distributed|shared|divided|split|separated|partitioned|segmented|sectionized|compartmentalized|categorized|classified|organized|structured|arranged|ordered|sorted|filed|indexed|tagged|labeled|marked|signed|stamped|sealed|certified|verified|validated|confirmed|authenticated|authorized|permitted|approved|accepted|received|acknowledged|recognized|admitted|confessed|disclosed|revealed|exposed|uncovered|unveiled|displayed|shown|exhibited|presented|demonstrated|illustrated|depicted|portrayed|represented|symbolized|signified|indicated|suggested|implied|inferred|deduced|concluded|reasoned|argued|debated|discussed|still)$/i;
+
+const normalizeExtractedContent = (text: string) =>
+  text.replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+
+const splitTaggedThinking = (
+  text: string,
+  pattern: RegExp,
+): Array<TExtractedThinkingSegment> => {
+  const segments: Array<TExtractedThinkingSegment> = [];
+  let lastIndex = 0;
+  pattern.lastIndex = 0;
+
+  let match = pattern.exec(text);
+  while (match != null) {
+    const before = text.slice(lastIndex, match.index);
+    if (before.length > 0) {
+      segments.push({ type: 'text', content: before });
+    }
+
+    const thinkingContent = normalizeExtractedContent(match[1] ?? '');
+    if (thinkingContent.length > 0) {
+      segments.push({ type: 'think', content: thinkingContent });
+    }
+
+    lastIndex = match.index + match[0].length;
+    match = pattern.exec(text);
+  }
+
+  const after = text.slice(lastIndex);
+  if (after.length > 0) {
+    segments.push({ type: 'text', content: after });
+  }
+
+  return segments.length > 0 ? segments : [{ type: 'text', content: text }];
+};
+
+const splitLeadingThinking = (text: string): Array<TExtractedThinkingSegment> => {
+  const normalizedText = text.replace(/\r\n/g, '\n');
+  const trimmedLeadingText = normalizedText.trimStart();
+  const prefixMatch = trimmedLeadingText.match(leadingThinkingPattern);
+
+  if (!prefixMatch) {
+    return [{ type: 'text', content: normalizedText }];
+  }
+
+  const remainder = trimmedLeadingText.slice(prefixMatch[0].length);
+  const answerMatch = answerHeadingPattern.exec(remainder);
+
+  if (!answerMatch) {
+    return [{ type: 'think', content: normalizeExtractedContent(trimmedLeadingText) }];
+  }
+
+  const reasoningContent = normalizeExtractedContent(remainder.slice(0, answerMatch.index));
+  const visibleContent = normalizeExtractedContent(
+    remainder.slice(answerMatch.index + answerMatch[0].length),
+  );
+  const segments: Array<TExtractedThinkingSegment> = [];
+
+  if (reasoningContent.length > 0) {
+    segments.push({ type: 'think', content: reasoningContent });
+  }
+
+  if (visibleContent.length > 0) {
+    segments.push({ type: 'text', content: visibleContent });
+  }
+
+  return segments.length > 0 ? segments : [{ type: 'text', content: normalizedText }];
+};
+
+const splitInlineReasoning = (text: string): Array<TExtractedThinkingSegment> => {
+  const splitPattern =
+    /\n{2,}|\n(?=Wait,|Better version|Better option|Hmm\s|Actually,|Let me reconsider|per guidelines|strict adherence|reading comprehension|based purely upon|settle this one|final decision point)/i;
+  const paragraphs = text.split(splitPattern);
+  if (paragraphs.length <= 1) {
+    return [{ type: 'text', content: text }];
+  }
+  const segments: Array<TExtractedThinkingSegment> = [];
+  let currentType: 'text' | 'think' = 'text';
+  let currentContent = '';
+  for (const para of paragraphs) {
+    const trimmed = para.trim();
+    if (!trimmed) continue;
+    const isReasoning = inlineReasoningBlockPattern.test(trimmed);
+    const segmentType = isReasoning ? 'think' : 'text';
+    if (segmentType === currentType) {
+      currentContent += (currentContent ? '\n\n' : '') + trimmed;
+    } else {
+      if (currentContent) segments.push({ type: currentType, content: currentContent });
+      currentType = segmentType;
+      currentContent = trimmed;
+    }
+  }
+  if (currentContent) segments.push({ type: currentType, content: currentContent });
+  return segments.length > 0 ? segments : [{ type: 'text', content: text }];
+};
+
+const truncateRepetitionChain = (text: string): string => {
+  const words = text.split(/\s+/);
+  if (words.length < 15) return text;
+  let consecutiveFiller = 0;
+  let truncateIndex = -1;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i].replace(/[^\p{L}\p{N}-]/gu, '');
+    if (fillerWordPattern.test(word) || /^[a-z]+ly$/i.test(word)) {
+      consecutiveFiller += 1;
+      if (consecutiveFiller >= 12) { truncateIndex = i - 11; break; }
+    } else { consecutiveFiller = 0; }
+  }
+  if (truncateIndex <= 0) return text;
+  return words.slice(0, truncateIndex).join(' ').trim();
+};
+
+const mergeExtractedSegments = (
+  segments: Array<TExtractedThinkingSegment>,
+): Array<TExtractedThinkingSegment> => {
+  const mergedSegments: Array<TExtractedThinkingSegment> = [];
+
+  for (const segment of segments) {
+    const normalizedContent =
+      segment.type === 'think'
+        ? normalizeExtractedContent(segment.content)
+        : segment.content.replace(/\r\n/g, '\n');
+    if (normalizedContent.trim().length === 0) {
+      continue;
+    }
+
+    const previousSegment = mergedSegments[mergedSegments.length - 1];
+    if (previousSegment?.type === segment.type) {
+      previousSegment.content +=
+        segment.type === 'think' ? `\n\n${normalizedContent}` : normalizedContent;
+      continue;
+    }
+
+    mergedSegments.push({
+      type: segment.type,
+      content: normalizedContent,
+    });
+  }
+
+  return mergedSegments;
+};
+
+const stripRegularContentFromThinkingSegments = (
+  segments: Array<TExtractedThinkingSegment>,
+  regularContent: string,
+): Array<TExtractedThinkingSegment> => {
+  const normalizedRegularContent = normalizeExtractedContent(regularContent);
+  if (!normalizedRegularContent) {
+    return segments;
+  }
+
+  let hasTrimmedDuplicate = false;
+
+  const dedupedSegments = segments
+    .map((segment, index, allSegments) => {
+      if (segment.type !== 'think') {
+        return segment;
+      }
+
+      const isLastThinkSegment =
+        allSegments.slice(index + 1).every((nextSegment) => nextSegment.type !== 'think');
+      if (!isLastThinkSegment) {
+        return segment;
+      }
+
+      const normalizedThinkingContent = normalizeExtractedContent(segment.content);
+      if (!normalizedThinkingContent) {
+        return null;
+      }
+
+      if (normalizedThinkingContent === normalizedRegularContent) {
+        hasTrimmedDuplicate = true;
+        return null;
+      }
+
+      if (normalizedThinkingContent.endsWith(normalizedRegularContent)) {
+        const trimmedContent = normalizeExtractedContent(
+          normalizedThinkingContent.slice(
+            0,
+            normalizedThinkingContent.length - normalizedRegularContent.length,
+          ),
+        );
+
+        if (!trimmedContent) {
+          hasTrimmedDuplicate = true;
+          return null;
+        }
+
+        hasTrimmedDuplicate = true;
+        return {
+          type: 'think' as const,
+          content: trimmedContent,
+        };
+      }
+
+      return segment;
+    })
+    .filter((segment): segment is TExtractedThinkingSegment => segment != null);
+
+  return hasTrimmedDuplicate ? mergeExtractedSegments(dedupedSegments) : segments;
+};
+
+export function extractThinkingContent(text: string): {
+  thinkingContent: string;
+  regularContent: string;
+  segments: Array<TExtractedThinkingSegment>;
+} {
+  if (!text) {
+    return {
+      thinkingContent: '',
+      regularContent: '',
+      segments: [],
+    };
+  }
+
+  const openThinkTag = '<think>';
+  const openThinkIdx = text.indexOf(openThinkTag);
+  const closeThinkTag = '</think>';
+  const closeThinkIdx = text.indexOf(closeThinkTag);
+  if (openThinkIdx !== -1 && closeThinkIdx === -1) {
+    const before = normalizeExtractedContent(text.slice(0, openThinkIdx));
+    const afterOpen = normalizeExtractedContent(text.slice(openThinkIdx + openThinkTag.length));
+    const segs: Array<TExtractedThinkingSegment> = [];
+    if (before) {
+      segs.push({ type: 'text', content: before });
+    }
+    if (afterOpen) {
+      segs.push({ type: 'think', content: afterOpen });
+    }
+    return {
+      thinkingContent: afterOpen,
+      regularContent: before,
+      segments: segs,
+    };
+  }
+
+  if (closeThinkIdx !== -1 && !text.includes('<think>')) {
+    const before = normalizeExtractedContent(text.slice(0, closeThinkIdx));
+    const after = normalizeExtractedContent(text.slice(closeThinkIdx + closeThinkTag.length));
+    const segs: Array<TExtractedThinkingSegment> = [];
+    if (before) {
+      segs.push({ type: 'think', content: before });
+    }
+    if (after) {
+      segs.push({ type: 'text', content: after });
+    }
+    if (segs.length > 0) {
+      return {
+        thinkingContent: before,
+        regularContent: after || text,
+        segments: segs,
+      };
+    }
+  }
+
+  let segments: Array<TExtractedThinkingSegment> = [{ type: 'text', content: text }];
+
+  for (const pattern of taggedThinkingPatterns) {
+    segments = segments.flatMap((segment) => {
+      if (segment.type === 'think') {
+        return [segment];
+      }
+
+      return splitTaggedThinking(segment.content, pattern);
+    });
+  }
+
+  segments = segments.flatMap((segment) => {
+    if (segment.type === 'think') {
+      return [segment];
+    }
+
+    return splitLeadingThinking(segment.content);
+  });
+
+  segments = segments.flatMap((segment) => {
+    if (segment.type === 'think') return [segment];
+    return splitInlineReasoning(segment.content);
+  });
+
+  const extractedSegments = mergeExtractedSegments(segments);
+  const rawRegularContent = extractedSegments
+    .filter((segment) => segment.type === 'text')
+    .map((segment) => segment.content)
+    .join('');
+  const hasThinkingSegments = extractedSegments.some((segment) => segment.type === 'think');
+  let regularContent = truncateRepetitionChain(
+    normalizeExtractedContent(rawRegularContent),
+  );
+  if (!regularContent.trim() && text.trim().length > 0 && !hasThinkingSegments) {
+    regularContent = normalizeExtractedContent(text);
+  }
+
+  const dedupedSegments = stripRegularContentFromThinkingSegments(extractedSegments, regularContent);
+  const thinkingContent = dedupedSegments
+    .filter((segment) => segment.type === 'think')
+    .map((segment) => segment.content)
+    .join('\n\n')
+    .trim();
+
+  return {
+    thinkingContent,
+    regularContent,
+    segments: dedupedSegments,
+  };
+}
+
+export function parseTextParts(
+  contentParts: Array<a.TMessageContentParts | undefined>,
+  skipReasoning: boolean = false,
+): string {
+  let result = '';
+
+  for (const part of contentParts) {
+    if (!part?.type) {
+      continue;
+    }
+    if (part.type === ContentTypes.TEXT) {
+      const textValue = (typeof part.text === 'string' ? part.text : part.text?.value) || '';
+      const extracted = extractThinkingContent(textValue);
+      const segments = skipReasoning
+        ? extracted.segments.filter((segment) => segment.type !== 'think')
+        : extracted.segments;
+
+      for (const segment of segments) {
+        const segmentText = segment.content;
+        if (
+          result.length > 0 &&
+          segmentText.length > 0 &&
+          result[result.length - 1] !== ' ' &&
+          segmentText[0] !== ' '
+        ) {
+          result += ' ';
+        }
+        result += segmentText;
+      }
+    } else if (part.type === ContentTypes.THINK && !skipReasoning) {
+      const textValue = typeof part.think === 'string' ? part.think : '';
+      if (
+        result.length > 0 &&
+        textValue.length > 0 &&
+        result[result.length - 1] !== ' ' &&
+        textValue[0] !== ' '
+      ) {
+        result += ' ';
+      }
+      result += textValue;
+    }
+  }
+
+  return result;
+}
+
+export const SEPARATORS = ['.', '?', '!', '۔', '。', '‥', ';', '¡', '¿', '\n', '```'];
+
+export function findLastSeparatorIndex(text: string, separators = SEPARATORS): number {
+  let lastIndex = -1;
+  for (const separator of separators) {
+    const index = text.lastIndexOf(separator);
+    if (index > lastIndex) {
+      lastIndex = index;
+    }
+  }
+  return lastIndex;
+}
+
+export function replaceSpecialVars({ text, user }: { text: string; user?: t.TUser | null }) {
+  let result = text;
+  if (!result) {
+    return result;
+  }
+
+  const now = dayjs();
+  const weekdayName = now.format('dddd');
+
+  const currentDate = now.format('YYYY-MM-DD');
+  result = result.replace(/{{current_date}}/gi, `${currentDate} (${weekdayName})`);
+
+  const currentDatetime = now.format('YYYY-MM-DD HH:mm:ss Z');
+  result = result.replace(/{{current_datetime}}/gi, `${currentDatetime} (${weekdayName})`);
+
+  const isoDatetime = now.toISOString();
+  result = result.replace(/{{iso_datetime}}/gi, isoDatetime);
+
+  if (user && user.name) {
+    result = result.replace(/{{current_user}}/gi, user.name);
+  }
+
+  return result;
+}
+
+/**
+ * Parsed ephemeral agent ID result
+ */
+export type ParsedEphemeralAgentId = {
+  endpoint: string;
+  model: string;
+  sender?: string;
+  index?: number;
+};
+
+/**
+ * Encodes an ephemeral agent ID from endpoint, model, optional sender, and optional index.
+ * Uses __ to replace : (reserved in graph node names) and ___ to separate sender.
+ *
+ * Format: endpoint__model___sender or endpoint__model___sender____index (if index provided)
+ *
+ * @example
+ * encodeEphemeralAgentId({ endpoint: 'openAI', model: 'gpt-4o', sender: 'GPT-4o' })
+ * // => 'openAI__gpt-4o___GPT-4o'
+ *
+ * @example
+ * encodeEphemeralAgentId({ endpoint: 'openAI', model: 'gpt-4o', sender: 'GPT-4o', index: 1 })
+ * // => 'openAI__gpt-4o___GPT-4o____1'
+ */
+export function encodeEphemeralAgentId({
+  endpoint,
+  model,
+  sender,
+  index,
+}: {
+  endpoint: string;
+  model: string;
+  sender?: string;
+  index?: number;
+}): string {
+  const base = `${endpoint}:${model}`.replace(/:/g, '__');
+  let result = base;
+  if (sender) {
+    // Use ___ as separator before sender to distinguish from __ in model names
+    result = `${base}___${sender.replace(/:/g, '__')}`;
+  }
+  if (index != null) {
+    // Use ____ (4 underscores) as separator for index
+    result = `${result}____${index}`;
+  }
+  return result;
+}
+
+/**
+ * Parses an ephemeral agent ID back into its components.
+ * Returns undefined if the ID doesn't match the expected format.
+ *
+ * Format: endpoint__model___sender or endpoint__model___sender____index
+ * - ____ (4 underscores) separates optional index suffix
+ * - ___ (triple underscore) separates model from optional sender
+ * - __ (double underscore) replaces : in endpoint/model names
+ *
+ * @example
+ * parseEphemeralAgentId('openAI__gpt-4o___GPT-4o')
+ * // => { endpoint: 'openAI', model: 'gpt-4o', sender: 'GPT-4o' }
+ *
+ * @example
+ * parseEphemeralAgentId('openAI__gpt-4o___GPT-4o____1')
+ * // => { endpoint: 'openAI', model: 'gpt-4o', sender: 'GPT-4o', index: 1 }
+ */
+export function parseEphemeralAgentId(agentId: string): ParsedEphemeralAgentId | undefined {
+  if (!agentId.includes('__')) {
+    return undefined;
+  }
+
+  // First check for index suffix (separated by ____)
+  let index: number | undefined;
+  let workingId = agentId;
+  if (agentId.includes('____')) {
+    const lastIndexSep = agentId.lastIndexOf('____');
+    const indexStr = agentId.slice(lastIndexSep + 4);
+    const parsedIndex = parseInt(indexStr, 10);
+    if (!isNaN(parsedIndex)) {
+      index = parsedIndex;
+      workingId = agentId.slice(0, lastIndexSep);
+    }
+  }
+
+  // Check for sender (separated by ___)
+  let sender: string | undefined;
+  let mainPart = workingId;
+  if (workingId.includes('___')) {
+    const [before, after] = workingId.split('___');
+    mainPart = before;
+    // Restore colons in sender if any
+    sender = after?.replace(/__/g, ':');
+  }
+
+  const [endpoint, ...modelParts] = mainPart.split('__');
+  if (!endpoint || modelParts.length === 0) {
+    return undefined;
+  }
+  // Restore colons in model name (model names can contain colons like claude-3:opus)
+  const model = modelParts.join(':');
+  return { endpoint, model, sender, index };
+}
+
+/**
+ * Checks if an agent ID represents an ephemeral (non-saved) agent.
+ * Real agent IDs always start with "agent_", so anything else is ephemeral.
+ */
+export function isEphemeralAgentId(agentId: string | null | undefined): boolean {
+  return !agentId?.startsWith('agent_');
+}
+
+/**
+ * Strips the index suffix (____N) from an agent ID if present.
+ * Works with both ephemeral and real agent IDs.
+ *
+ * @example
+ * stripAgentIdSuffix('agent_abc123____1') // => 'agent_abc123'
+ * stripAgentIdSuffix('openAI__gpt-4o___GPT-4o____1') // => 'openAI__gpt-4o___GPT-4o'
+ * stripAgentIdSuffix('agent_abc123') // => 'agent_abc123' (unchanged)
+ */
+export function stripAgentIdSuffix(agentId: string): string {
+  return agentId.replace(/____\d+$/, '');
+}
+
+/**
+ * Appends an index suffix (____N) to an agent ID.
+ * Used to distinguish parallel agents with the same base ID.
+ *
+ * @example
+ * appendAgentIdSuffix('agent_abc123', 1) // => 'agent_abc123____1'
+ * appendAgentIdSuffix('openAI__gpt-4o___GPT-4o', 1) // => 'openAI__gpt-4o___GPT-4o____1'
+ */
+export function appendAgentIdSuffix(agentId: string, index: number): string {
+  return `${agentId}____${index}`;
+}
+
+const SUGGESTIONS_PATTERN = /\[suggestions\]([\s\S]*?)\[\/suggestions\]/g;
+const MAX_SUGGESTIONS = 4;
+
+export type ExtractedSuggestions = {
+  cleanText: string;
+  suggestions: string[];
+};
+
+/**
+ * Extracts `[suggestions]...[/suggestions]` blocks from LLM output.
+ * Returns the text with those blocks removed and a list of suggestion strings.
+ * If no tags are found, returns the original text with an empty suggestions array.
+ */
+export function extractSuggestions(text: string): ExtractedSuggestions {
+  if (!text || !text.includes('[suggestions]')) {
+    return { cleanText: text, suggestions: [] };
+  }
+
+  const suggestions: string[] = [];
+  const cleanText = text.replace(SUGGESTIONS_PATTERN, (_match, inner: string) => {
+    const lines = inner
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    for (const line of lines) {
+      if (suggestions.length < MAX_SUGGESTIONS) {
+        suggestions.push(line);
+      }
+    }
+    return '';
+  }).trim();
+
+  return { cleanText, suggestions };
+}
+
+const THINK_PATTERN = /<think>[\s\S]*?<\/think>/g;
+const SUGGESTIONS_BLOCK_PATTERN = /\[suggestions\][\s\S]*?\[\/suggestions\]/g;
+const ITALIC_ASTERISK_PATTERN = /\*[^*\n]+\*/g;
+const BOLD_PATTERN = /\*\*([^*]+)\*\*/g;
+const BOLD_UNDERSCORE_PATTERN = /__([^_]+)__/g;
+const HEADERS_PATTERN = /^#{1,6}\s+/gm;
+const LINK_PATTERN = /\[([^\]]+)\]\([^)]+\)/g;
+const CODE_BLOCK_PATTERN = /```[\s\S]*?```/g;
+const INLINE_CODE_PATTERN = /`([^`]+)`/g;
+const EMOJI_PATTERN =
+  /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+const MULTI_NEWLINE_PATTERN = /\n{2,}/g;
+const MULTI_SPACE_PATTERN = / {2,}/g;
+const ROLEPLAY_FORMATTING_PATTERN = /(\*[^*\n]+\*)|(_[^_\n]+_)/;
+const DOUBLE_QUOTE_DIALOGUE_PATTERN = /"([^"\n][\s\S]*?)"/g;
+const SMART_QUOTE_DIALOGUE_PATTERN = /[“”]([^“”\n][\s\S]*?)[“”]/g;
+
+/**
+ * Strips markdown, thinking blocks, suggestion tags, and emoji from text
+ * before sending to a TTS provider so only spoken dialogue remains.
+ */
+export function sanitizeTextForTTS(text: string): string {
+  if (!text) {
+    return text;
+  }
+
+  return text
+    .replace(THINK_PATTERN, '')
+    .replace(SUGGESTIONS_BLOCK_PATTERN, '')
+    .replace(CODE_BLOCK_PATTERN, '')
+    .replace(ITALIC_ASTERISK_PATTERN, '')
+    .replace(BOLD_PATTERN, '$1')
+    .replace(BOLD_UNDERSCORE_PATTERN, '$1')
+    .replace(HEADERS_PATTERN, '')
+    .replace(LINK_PATTERN, '$1')
+    .replace(INLINE_CODE_PATTERN, '$1')
+    .replace(EMOJI_PATTERN, '')
+    .replace(MULTI_NEWLINE_PATTERN, '. ')
+    .replace(MULTI_SPACE_PATTERN, ' ')
+    .trim();
+}
+
+/**
+ * Extracts spoken dialogue for TTS.
+ * If the text contains quoted speech, only the quoted segments are returned.
+ * Otherwise, it falls back to the fully sanitized text.
+ */
+export function extractDialogueForTTS(text: string): string {
+  const hasRoleplayFormatting = ROLEPLAY_FORMATTING_PATTERN.test(text);
+  const sanitized = sanitizeTextForTTS(text);
+  if (!sanitized) {
+    return sanitized;
+  }
+
+  const matches: string[] = [];
+  const patterns = [DOUBLE_QUOTE_DIALOGUE_PATTERN, SMART_QUOTE_DIALOGUE_PATTERN];
+
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    pattern.lastIndex = 0;
+    match = pattern.exec(sanitized);
+    while (match != null) {
+      const value = match[1]?.trim();
+      if (value) {
+        matches.push(value);
+      }
+      match = pattern.exec(sanitized);
+    }
+  }
+
+  if (matches.length === 0) {
+    if (hasRoleplayFormatting) {
+      return '';
+    }
+    return sanitized;
+  }
+
+  return matches.join(' ').replace(MULTI_SPACE_PATTERN, ' ').trim();
+}
