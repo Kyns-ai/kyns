@@ -22,7 +22,7 @@
   <a href="https://github.com/Kyns-ai/kyns/stargazers">
     <img src="https://img.shields.io/github/stars/Kyns-ai/kyns?style=for-the-badge&color=yellow">
   </a>
-  <a href="https://discord.gg/WJjqmG7b">
+  <a href="https://discord.gg/kyns">
     <img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?style=for-the-badge&logo=discord&logoColor=white">
   </a>
 </p>
