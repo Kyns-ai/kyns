@@ -99,15 +99,16 @@ export const createMemoryTool = ({
   const isOverflowing = tokenLimit ? remainingTokens <= 0 : false;
 
   return tool(
-    async ({ key, value }) => {
+    async ({ key: rawKey, value }) => {
       try {
+        const key = rawKey.replace(/[^a-z_]/gi, '');
         if (validKeys && validKeys.length > 0 && !validKeys.includes(key)) {
           logger.warn(
-            `Memory Agent failed to set memory: Invalid key "${key}". Must be one of: ${validKeys.join(
+            `Memory Agent failed to set memory: Invalid key "${rawKey}". Must be one of: ${validKeys.join(
               ', ',
             )}`,
           );
-          return [`Invalid key "${key}". Must be one of: ${validKeys.join(', ')}`, undefined];
+          return [`Invalid key "${rawKey}". Must be one of: ${validKeys.join(', ')}`, undefined];
         }
 
         const tokenCount = Tokenizer.getTokenCount(value, 'o200k_base');
@@ -211,15 +212,16 @@ const createDeleteMemoryTool = ({
   agentId?: string;
 }) => {
   return tool(
-    async ({ key }) => {
+    async ({ key: rawKey }) => {
       try {
+        const key = rawKey.replace(/[^a-z_]/gi, '');
         if (validKeys && validKeys.length > 0 && !validKeys.includes(key)) {
           logger.warn(
-            `Memory Agent failed to delete memory: Invalid key "${key}". Must be one of: ${validKeys.join(
+            `Memory Agent failed to delete memory: Invalid key "${rawKey}". Must be one of: ${validKeys.join(
               ', ',
             )}`,
           );
-          return [`Invalid key "${key}". Must be one of: ${validKeys.join(', ')}`, undefined];
+          return [`Invalid key "${rawKey}". Must be one of: ${validKeys.join(', ')}`, undefined];
         }
 
         const artifact: Record<Tools.memory, MemoryArtifact> = {
