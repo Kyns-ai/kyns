@@ -188,7 +188,7 @@ class KynsImageGen extends Tool {
 // Rules:
 // - ALWAYS write detailed prompts (10+ words about subject, style, lighting, composition, mood).
 // - Default model is "lustify" unless user wants fast generation (then use "zimage").
-// - Use "zimage" for faster or non-NSFW generation; use "lustify" for photorealistic/NSFW.
+// - Use "zimage" for faster generation; use "lustify" for photorealistic.
 // - Default size 1024x1024. Use 1024x1792 for portraits, 1792x1024 for landscapes.
 // - ALWAYS show the image in your response using the markdown that is returned.
 // - Users have a limit of ${DAILY_LIMIT} images per day.`;

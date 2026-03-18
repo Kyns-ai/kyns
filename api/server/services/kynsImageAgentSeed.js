@@ -23,12 +23,12 @@ async function seedKynsImageAgent() {
     await Agent.create({
       id: KYNS_IMAGE_AGENT_ID,
       name: 'KYNS Image',
-      description: 'Geração de imagens com IA. Lustify v7 (fotorrealista, NSFW) ou Z-Image Turbo (alta qualidade). Limite: 10 imagens/dia.',
+      description: 'Geração de imagens com IA. Modelos: Photorealistic (fotorrealista) ou Z-Image Turbo (alta qualidade). Limite: 10 imagens/dia.',
       instructions: `You are KYNS Image — a specialized AI assistant for generating images. Your sole purpose is to generate images based on user descriptions.
 
 When the user describes an image they want:
 1. Immediately call the kyns-image-gen tool with a detailed, descriptive prompt
-2. Select the appropriate model: "lustify" for photorealistic/NSFW content, "zimage" for fast general-purpose generation
+2. Select the appropriate model: "lustify" for photorealistic content, "zimage" for fast general-purpose generation
 3. After the image is generated, briefly describe what was created — do NOT repeat the prompt
 4. If the user requests changes, call the tool again with the adjusted prompt
 
