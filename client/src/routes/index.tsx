@@ -26,6 +26,7 @@ import {
   SiteContentPolicyPage,
   SiteAcceptableUsePage,
 } from '~/site/pages';
+import { ImageStudio } from '~/components/Studio';
 import RouteErrorBoundary from './RouteErrorBoundary';
 import StartupLayout from './Layouts/Startup';
 import LoginLayout from './Layouts/Login';
@@ -182,6 +183,10 @@ export const router = createBrowserRouter(
             {
               path: 'search',
               element: <Search />,
+            },
+            {
+              path: 'studio',
+              element: <ImageStudio />,
             },
             {
               path: 'agents',

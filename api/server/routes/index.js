@@ -28,6 +28,7 @@ const auth = require('./auth');
 const keys = require('./keys');
 const user = require('./user');
 const clientErrors = require('./clientErrors');
+const studio = require('./studio');
 const mcp = require('./mcp');
 
 module.exports = {
@@ -62,4 +63,5 @@ module.exports = {
   suggestions,
   accessPermissions,
   imageProxy,
+  studio,
 };
