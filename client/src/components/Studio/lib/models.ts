@@ -24,6 +24,7 @@ interface StudioModel {
   imageField?: string;
   videoField?: string;
   audioField?: string;
+  spicy?: boolean;
 }
 
 export type { InputType, ModelInput, StudioModel };
@@ -729,10 +730,17 @@ export const t2vModels: StudioModel[] = [
     name: 'Grok Video',
     endpoint: 'grok-imagine-text-to-video',
     category: 't2v',
-    description: 'xAI video',
+    description: 'xAI video — suporta modo Spicy',
+    spicy: true,
     inputs: {
       prompt: { type: 'textarea', label: 'Prompt' },
-      duration: { type: 'select', label: 'Duration', default: '5', enum: ['5', '10'] },
+      mode: {
+        type: 'select',
+        label: 'Mode',
+        default: 'normal',
+        enum: ['normal', 'fun', 'spicy'],
+      },
+      duration: { type: 'select', label: 'Duration', default: '6', enum: ['6', '10', '15'] },
       aspect_ratio: {
         type: 'select',
         label: 'Aspect Ratio',
@@ -766,6 +774,27 @@ export const i2vModels: StudioModel[] = [
         default: '16:9',
         enum: ['16:9', '9:16', '1:1'],
       },
+    },
+  },
+  {
+    id: 'wan2.2-spicy-image-to-video',
+    name: 'Wan 2.2 Spicy I2V',
+    endpoint: 'wan2.2-spicy-image-to-video',
+    category: 'i2v',
+    description: 'Alibaba I2V sem censura',
+    spicy: true,
+    requiresImage: true,
+    imageField: 'image_url',
+    inputs: {
+      prompt: { type: 'textarea', label: 'Prompt' },
+      image_url: { type: 'text', label: 'Image URL' },
+      resolution: {
+        type: 'select',
+        label: 'Resolution',
+        default: '480p',
+        enum: ['480p', '720p'],
+      },
+      duration: { type: 'select', label: 'Duration', default: '5', enum: ['5', '8'] },
     },
   },
   {

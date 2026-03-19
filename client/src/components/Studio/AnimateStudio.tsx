@@ -1,12 +1,15 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Camera, Play, Sparkles, Wand2 } from 'lucide-react';
-import { generateAndPoll } from './lib/studioApi';
-import UploadPicker from './components/UploadPicker';
-import GenerationResult from './components/GenerationResult';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Check, Clock, Monitor, Sparkles } from 'lucide-react';
+import { useLocalize } from '~/hooks';
 import GenerationHistory from './components/GenerationHistory';
+import GenerationResult from './components/GenerationResult';
+import UploadPicker from './components/UploadPicker';
 import type { HistoryEntry } from './components/GenerationHistory';
+import { generateAndPoll } from './lib/studioApi';
 
-type AnimationType = 'free' | 'dance' | 'cinematic' | 'speak';
+const WAN_ANIMATE_ENDPOINT = 'wan2.2-animate';
+
+type AnimateMode = 'animate' | 'replace';
 
 interface SavedInfluencer {
   id: string;
@@ -14,34 +17,6 @@ interface SavedInfluencer {
   imageUrl: string;
   createdAt: number;
 }
-
-const DANCE_STYLES = [
-  'tiktok_dance',
-  'hip_hop',
-  'salsa',
-  'ballet',
-  'breakdance',
-  'robot',
-  'shuffle',
-  'wave',
-  'pop',
-  'lock',
-] as const;
-
-const CINEMATIC_EFFECTS = [
-  'zoom_in',
-  'zoom_out',
-  'pan_left',
-  'pan_right',
-  'rotate',
-  'shake',
-  'slow_motion',
-] as const;
-
-const SPEAK_MODELS = [
-  { id: 'wan2.2-speech-to-video', name: 'Wan 2.2 Speech' },
-  { id: 'infinitetalk-image-to-video', name: 'InfiniteTalk' },
-] as const;
 
 function loadInfluencers(): SavedInfluencer[] {
   try {
@@ -52,27 +27,15 @@ function loadInfluencers(): SavedInfluencer[] {
   }
 }
 
-const STEPS = [
-  { num: 1, label: 'Upload sua foto', icon: <Camera className="h-5 w-5" /> },
-  { num: 2, label: 'Escolha a animação', icon: <Play className="h-5 w-5" /> },
-  { num: 3, label: 'Gere o vídeo', icon: <Sparkles className="h-5 w-5" /> },
-];
-
 export default function AnimateStudio() {
+  const localize = useLocalize();
   const [imageUrl, setImageUrl] = useState('');
-  const [animType, setAnimType] = useState<AnimationType>('free');
-  const [prompt, setPrompt] = useState('');
-  const [danceStyle, setDanceStyle] = useState<string>('tiktok_dance');
-  const [cinematicEffect, setCinematicEffect] = useState<string>('zoom_in');
-  const [duration, setDuration] = useState('5');
-  const [aspectRatio, setAspectRatio] = useState('16:9');
-  const [audioUrl, setAudioUrl] = useState('');
-  const [speakModel, setSpeakModel] = useState(SPEAK_MODELS[0].id);
-  const [resolution, setResolution] = useState('720');
-
+  const [videoUrl, setVideoUrl] = useState('');
+  const [mode, setMode] = useState<AnimateMode>('animate');
+  const [resolution, setResolution] = useState<'480p' | '720p'>('480p');
   const [influencers, setInfluencers] = useState<SavedInfluencer[]>([]);
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
-  const [output, setOutput] = useState<Record<string, string> | undefined>();
+  const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
@@ -88,52 +51,35 @@ export default function AnimateStudio() {
   }, []);
 
   const handleGenerate = useCallback(async () => {
-    if (!imageUrl) {
+    if (!imageUrl || !videoUrl) {
       return;
     }
     setStatus('processing');
     setError('');
-    setOutput(undefined);
+    setOutput(null);
+
+    const modelLabel =
+      mode === 'replace'
+        ? localize('com_studio_animate_model_replace_name')
+        : localize('com_studio_animate_model_animate_name');
 
     try {
-      let endpoint: string;
-      let params: Record<string, string | number | boolean> = {};
-      let modelName: string;
+      const params: Record<string, string | number | boolean> = {
+        image_url: imageUrl,
+        video_url: videoUrl,
+        mode,
+        resolution,
+      };
 
-      switch (animType) {
-        case 'free':
-          endpoint = 'wan2.2-image-to-video';
-          modelName = 'Wan 2.2 I2V';
-          params = { prompt: prompt.trim(), image_url: imageUrl, duration, aspect_ratio: aspectRatio };
-          break;
-        case 'dance':
-          endpoint = 'ai-dance-effects';
-          modelName = 'Dance Effects';
-          params = { image_url: imageUrl, name: danceStyle };
-          break;
-        case 'cinematic':
-          endpoint = 'ai-video-effects';
-          modelName = 'Video Effects';
-          params = { prompt: cinematicEffect, image_url: imageUrl };
-          break;
-        case 'speak':
-          endpoint = speakModel;
-          modelName = SPEAK_MODELS.find((m) => m.id === speakModel)?.name ?? speakModel;
-          params = { image_url: imageUrl, audio_url: audioUrl, resolution };
-          break;
-        default:
-          return;
-      }
-
-      const result = await generateAndPoll(endpoint, params, setStatus as (s: string) => void);
+      const result = await generateAndPoll(WAN_ANIMATE_ENDPOINT, params, setStatus as (s: string) => void);
       setOutput(result);
       setStatus('completed');
       setHistory((prev) => [
         {
           id: Date.now().toString(),
           output: result,
-          model: modelName,
-          prompt: prompt.trim() || animType,
+          model: modelLabel,
+          prompt: mode,
           timestamp: Date.now(),
         },
         ...prev,
@@ -142,96 +88,62 @@ export default function AnimateStudio() {
       setError(err instanceof Error ? err.message : 'Generation failed');
       setStatus('failed');
     }
-  }, [imageUrl, animType, prompt, danceStyle, cinematicEffect, duration, aspectRatio, audioUrl, speakModel, resolution]);
+  }, [imageUrl, videoUrl, mode, resolution, localize]);
 
   const handleHistorySelect = useCallback((entry: HistoryEntry) => {
     setOutput(entry.output);
     setStatus('completed');
   }, []);
 
-  const canGenerate = (() => {
-    if (!imageUrl || status === 'processing') {
-      return false;
-    }
-    switch (animType) {
-      case 'free':
-        return !!prompt.trim();
-      case 'dance':
-        return true;
-      case 'cinematic':
-        return true;
-      case 'speak':
-        return !!audioUrl;
-      default:
-        return false;
-    }
-  })();
+  const canGenerate = Boolean(imageUrl && videoUrl) && status !== 'processing';
 
-  const currentStep = !imageUrl ? 1 : animType ? 3 : 2;
+  const lime = {
+    border: 'border-lime-400/35',
+    ring: 'ring-lime-400/50',
+    text: 'text-lime-400',
+    bgSel: 'bg-lime-400/15',
+    iconSel: 'text-lime-400',
+    btn: 'bg-lime-400 text-black hover:bg-lime-300',
+  };
+
+  const modelOptions: { id: AnimateMode; nameKey: string; descKey: string }[] = [
+    {
+      id: 'replace',
+      nameKey: 'com_studio_animate_model_replace_name',
+      descKey: 'com_studio_animate_model_replace_desc',
+    },
+    {
+      id: 'animate',
+      nameKey: 'com_studio_animate_model_animate_name',
+      descKey: 'com_studio_animate_model_animate_desc',
+    },
+  ];
 
   return (
-    <div className="flex flex-col gap-6 p-4">
-      {/* Steps Header */}
-      <div className="flex items-center justify-center gap-2 sm:gap-4">
-        {STEPS.map((step, idx) => (
-          <React.Fragment key={step.num}>
-            {idx > 0 && (
-              <div
-                className={`hidden h-px w-8 sm:block ${
-                  currentStep >= step.num ? 'bg-purple-500' : 'bg-white/10'
-                }`}
-              />
-            )}
-            <div
-              className={`flex items-center gap-2 rounded-xl px-3 py-2 sm:px-4 sm:py-3 ${
-                currentStep >= step.num
-                  ? 'border border-purple-500/30 bg-purple-500/10'
-                  : 'border border-white/10 bg-white/5'
-              }`}
-            >
-              <div
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                  currentStep >= step.num
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-white/10 text-gray-500'
-                }`}
-              >
-                {step.num}
-              </div>
-              <div className="hidden sm:flex sm:items-center sm:gap-1.5">
-                <span className={currentStep >= step.num ? 'text-purple-400' : 'text-gray-600'}>
-                  {step.icon}
-                </span>
-                <span
-                  className={`text-sm font-medium ${
-                    currentStep >= step.num ? 'text-white' : 'text-gray-500'
-                  }`}
-                >
-                  {step.label}
-                </span>
-              </div>
-            </div>
-          </React.Fragment>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Controls Column */}
-        <div className="flex w-full flex-col gap-4 lg:w-80 lg:flex-shrink-0">
-          {/* Step 1: Image */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
-            <h3 className="mb-3 text-sm font-medium text-white">1. Foto de Referência</h3>
+    <div className="flex flex-col gap-6 p-4 text-white">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <aside className="flex w-full flex-shrink-0 flex-col gap-4 lg:w-80">
+          <div
+            className={`rounded-xl border border-dashed ${lime.border} bg-[#141414] p-4`}
+            role="region"
+            aria-label={localize('com_studio_animate_upload_image_title')}
+          >
+            <p className="text-sm font-medium text-white">{localize('com_studio_animate_upload_image_title')}</p>
+            <p className="mb-3 text-xs text-gray-500">{localize('com_studio_animate_upload_image_hint')}</p>
             <UploadPicker accept="image" value={imageUrl} onChange={setImageUrl} />
             {influencers.length > 0 && (
               <div className="mt-3 flex flex-col gap-1">
-                <label className="text-xs text-gray-400">Ou usar influenciador salvo:</label>
+                <label htmlFor="kyns-animate-influencer" className="text-xs text-gray-500">
+                  {localize('com_studio_animate_saved_character')}
+                </label>
                 <select
+                  id="kyns-animate-influencer"
                   onChange={handleInfluencerSelect}
                   defaultValue=""
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                  className={`rounded-lg border ${lime.border} bg-white/5 px-3 py-2 text-sm text-white outline-none focus:ring-2 ${lime.ring}`}
                 >
                   <option value="" disabled className="bg-gray-900">
-                    Selecionar...
+                    —
                   </option>
                   {influencers.map((inf) => (
                     <option key={inf.id} value={inf.id} className="bg-gray-900">
@@ -241,178 +153,170 @@ export default function AnimateStudio() {
                 </select>
               </div>
             )}
-            {imageUrl && (
-              <img
-                src={imageUrl}
-                alt="Preview"
-                className="mt-3 h-32 w-full rounded-lg object-cover"
-              />
-            )}
+            {imageUrl ? (
+              <img src={imageUrl} alt="" className="mt-3 h-24 w-full rounded-lg object-cover" />
+            ) : null}
           </div>
 
-          {/* Step 2: Animation Type */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
-            <h3 className="mb-3 text-sm font-medium text-white">2. Tipo de Animação</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  { id: 'free' as const, label: 'Animar Livre', desc: 'Prompt + movimento' },
-                  { id: 'dance' as const, label: 'Dançar', desc: 'Escolha o estilo' },
-                  { id: 'cinematic' as const, label: 'Efeitos', desc: 'Câmera e efeitos' },
-                  { id: 'speak' as const, label: 'Falar', desc: 'Lip sync com áudio' },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setAnimType(opt.id)}
-                  className={`rounded-lg border p-3 text-left transition-colors ${
-                    animType === opt.id
-                      ? 'border-purple-500 bg-purple-500/20'
-                      : 'border-white/10 bg-white/5 hover:border-white/20'
-                  }`}
-                >
-                  <p
-                    className={`text-sm font-medium ${
-                      animType === opt.id ? 'text-purple-300' : 'text-white'
+          <div
+            className={`rounded-xl border border-dashed ${lime.border} bg-[#141414] p-4`}
+            role="region"
+            aria-label={localize('com_studio_animate_upload_video_title')}
+          >
+            <p className="text-sm font-medium text-white">{localize('com_studio_animate_upload_video_title')}</p>
+            <p className="mb-3 text-xs text-gray-500">{localize('com_studio_animate_upload_video_hint')}</p>
+            <UploadPicker accept="video" value={videoUrl} onChange={setVideoUrl} />
+            {videoUrl ? (
+              <video src={videoUrl} muted className="mt-3 h-24 w-full rounded-lg object-cover" playsInline />
+            ) : null}
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-[#141414] p-4">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
+              {localize('com_studio_animate_model_label')}
+            </p>
+            <div className="flex flex-col gap-2">
+              {modelOptions.map((opt) => {
+                const selected = mode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setMode(opt.id)}
+                    className={`relative flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors ${
+                      selected
+                        ? `border-lime-400/60 ${lime.bgSel} ring-1 ring-lime-400/30`
+                        : 'border-white/10 bg-[#1a1a1a] hover:border-white/20'
                     }`}
                   >
-                    {opt.label}
-                  </p>
-                  <p className="text-xs text-gray-400">{opt.desc}</p>
-                </button>
-              ))}
-            </div>
-
-            {/* Animation-specific controls */}
-            <div className="mt-3 flex flex-col gap-3">
-              {animType === 'free' && (
-                <>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-400">Prompt</label>
-                    <textarea
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder="Descreva o movimento..."
-                      rows={3}
-                      className="resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-purple-500"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-400">Duration</label>
-                      <select
-                        value={duration}
-                        onChange={(e) => setDuration(e.target.value)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                      >
-                        <option value="3" className="bg-gray-900">3s</option>
-                        <option value="5" className="bg-gray-900">5s</option>
-                      </select>
+                    <div
+                      className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${
+                        selected ? 'bg-lime-400/20' : 'bg-white/5'
+                      }`}
+                      aria-hidden
+                    >
+                      <Sparkles className={`h-5 w-5 ${selected ? lime.iconSel : 'text-gray-500'}`} />
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-400">Aspect Ratio</label>
-                      <select
-                        value={aspectRatio}
-                        onChange={(e) => setAspectRatio(e.target.value)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                      >
-                        {['16:9', '9:16', '1:1'].map((r) => (
-                          <option key={r} value={r} className="bg-gray-900">{r}</option>
-                        ))}
-                      </select>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-white">{localize(opt.nameKey)}</p>
+                      <p className="text-xs text-gray-500">{localize(opt.descKey)}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">
+                          <Monitor className="h-3 w-3" />
+                          {localize('com_studio_animate_spec_resolution')}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">
+                          <Clock className="h-3 w-3" />
+                          {localize('com_studio_animate_spec_duration')}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
-
-              {animType === 'dance' && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-400">Dance Style</label>
-                  <select
-                    value={danceStyle}
-                    onChange={(e) => setDanceStyle(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                  >
-                    {DANCE_STYLES.map((s) => (
-                      <option key={s} value={s} className="bg-gray-900">
-                        {s.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {animType === 'cinematic' && (
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-400">Effect</label>
-                  <select
-                    value={cinematicEffect}
-                    onChange={(e) => setCinematicEffect(e.target.value)}
-                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                  >
-                    {CINEMATIC_EFFECTS.map((eff) => (
-                      <option key={eff} value={eff} className="bg-gray-900">
-                        {eff.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {animType === 'speak' && (
-                <>
-                  <UploadPicker accept="audio" value={audioUrl} onChange={setAudioUrl} label="Áudio" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-400">Modelo</label>
-                      <select
-                        value={speakModel}
-                        onChange={(e) => setSpeakModel(e.target.value)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                      >
-                        {SPEAK_MODELS.map((m) => (
-                          <option key={m.id} value={m.id} className="bg-gray-900">
-                            {m.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-gray-400">Resolution</label>
-                      <select
-                        value={resolution}
-                        onChange={(e) => setResolution(e.target.value)}
-                        className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-                      >
-                        <option value="512" className="bg-gray-900">480p</option>
-                        <option value="720" className="bg-gray-900">720p</option>
-                        <option value="1024" className="bg-gray-900">1024p</option>
-                      </select>
-                    </div>
-                  </div>
-                </>
-              )}
+                    {selected ? (
+                      <Check className={`h-5 w-5 flex-shrink-0 ${lime.iconSel}`} aria-hidden />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Step 3: Generate */}
+          <div className="flex flex-col gap-2">
+            <label htmlFor="kyns-animate-resolution" className="text-xs font-medium text-gray-500">
+              {localize('com_studio_animate_resolution')}
+            </label>
+            <select
+              id="kyns-animate-resolution"
+              value={resolution}
+              onChange={(e) => setResolution(e.target.value as '480p' | '720p')}
+              className={`rounded-xl border ${lime.border} bg-[#141414] px-3 py-3 text-sm text-white outline-none focus:ring-2 ${lime.ring}`}
+            >
+              <option value="480p" className="bg-gray-900">
+                {localize('com_studio_animate_resolution_480')}
+              </option>
+              <option value="720p" className="bg-gray-900">
+                {localize('com_studio_animate_resolution_720')}
+              </option>
+            </select>
+          </div>
+
           <button
             type="button"
             onClick={handleGenerate}
             disabled={!canGenerate}
-            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-4 text-base font-bold text-white shadow-lg shadow-purple-500/25 transition-all hover:shadow-purple-500/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+            className={`rounded-xl px-6 py-4 text-base font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${lime.btn}`}
           >
-            <Wand2 className="h-5 w-5" />
-            {status === 'processing' ? 'Gerando vídeo...' : '3. Gerar Vídeo'}
+            {status === 'processing'
+              ? localize('com_studio_animate_generating')
+              : localize('com_studio_animate_generate')}
           </button>
-        </div>
 
-        {/* Result Column */}
-        <div className="flex flex-1 flex-col gap-4">
-          <GenerationResult status={status} output={output} error={error} />
+          <a
+            href="https://muapi.ai/playground/wan2.2-animate"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-center text-xs text-gray-500 underline decoration-gray-600 underline-offset-2 hover:text-lime-400/90"
+          >
+            {localize('com_studio_animate_explore')}
+          </a>
+        </aside>
+
+        <main className="flex min-h-[420px] flex-1 flex-col gap-4 rounded-2xl border border-white/10 bg-[#0d0d0d] p-6 lg:p-10">
+          {output || status === 'processing' || status === 'failed' ? (
+            <GenerationResult status={status} output={output} error={error} />
+          ) : (
+            <div className="mx-auto flex max-w-xl flex-col items-center text-center">
+              <span
+                className={`mb-4 inline-flex items-center gap-1.5 rounded-full border ${lime.border} px-3 py-1 text-xs font-medium ${lime.text}`}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {localize('com_studio_animate_badge')}
+              </span>
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                <span className="text-white">{localize('com_studio_animate_headline_1')}</span>
+                <br />
+                <span className={lime.text}>{localize('com_studio_animate_headline_2')}</span>
+              </h2>
+              <p className="mt-3 text-sm text-gray-500">{localize('com_studio_animate_subhead')}</p>
+              <div className="mt-10 w-full text-left">
+                <h3 className="mb-4 text-center text-xs font-bold tracking-widest text-white">
+                  {localize('com_studio_animate_steps_title')}{' '}
+                  <span className={lime.text}>{localize('com_studio_animate_steps_highlight')}</span>
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {[
+                    {
+                      n: 1,
+                      title: localize('com_studio_animate_step1_title'),
+                      desc: localize('com_studio_animate_step1_desc'),
+                    },
+                    {
+                      n: 2,
+                      title: localize('com_studio_animate_step2_title'),
+                      desc: localize('com_studio_animate_step2_desc'),
+                    },
+                    {
+                      n: 3,
+                      title: localize('com_studio_animate_step3_title'),
+                      desc: localize('com_studio_animate_step3_desc'),
+                    },
+                  ].map((step) => (
+                    <div
+                      key={step.n}
+                      className="relative rounded-xl border border-white/10 bg-[#141414] p-4 pt-8"
+                    >
+                      <span className="absolute left-3 top-3 flex h-6 w-6 items-center justify-center bg-lime-400 text-xs font-bold text-black">
+                        {step.n}
+                      </span>
+                      <p className="text-[11px] font-bold leading-snug text-white">{step.title}</p>
+                      <p className="mt-2 text-[11px] leading-snug text-gray-500">{step.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           <GenerationHistory entries={history} onSelect={handleHistorySelect} />
-        </div>
+        </main>
       </div>
     </div>
   );
