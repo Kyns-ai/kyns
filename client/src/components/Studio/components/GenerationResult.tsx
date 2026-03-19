@@ -3,28 +3,18 @@ import { Download, Loader2, AlertCircle } from 'lucide-react';
 
 interface GenerationResultProps {
   status: 'idle' | 'processing' | 'completed' | 'failed';
-  output?: Record<string, string>;
+  output?: string | null;
   error?: string;
 }
 
-function getMediaUrl(output: Record<string, string>): { url: string; type: 'image' | 'video' | 'audio' } | null {
-  if (output.image_url) {
-    return { url: output.image_url, type: 'image' };
+function detectMediaType(url: string): 'image' | 'video' | 'audio' {
+  if (url.match(/\.(mp4|webm|mov|avi)(\?|$)/i)) {
+    return 'video';
   }
-  if (output.video_url) {
-    return { url: output.video_url, type: 'video' };
+  if (url.match(/\.(mp3|wav|ogg|aac)(\?|$)/i)) {
+    return 'audio';
   }
-  if (output.audio_url) {
-    return { url: output.audio_url, type: 'audio' };
-  }
-  const firstUrl = Object.values(output).find((v) => typeof v === 'string' && v.startsWith('http'));
-  if (firstUrl) {
-    if (firstUrl.match(/\.(mp4|webm|mov)(\?|$)/i)) {
-      return { url: firstUrl, type: 'video' };
-    }
-    return { url: firstUrl, type: 'image' };
-  }
-  return null;
+  return 'image';
 }
 
 function handleDownload(url: string, type: string) {
@@ -70,29 +60,22 @@ export default function GenerationResult({ status, output, error }: GenerationRe
     return null;
   }
 
-  const media = getMediaUrl(output);
-  if (!media) {
-    return (
-      <div className="flex h-full items-center justify-center rounded-xl border border-white/10 bg-white/5 p-12">
-        <p className="text-sm text-gray-400">No output received</p>
-      </div>
-    );
-  }
+  const mediaType = detectMediaType(output);
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5">
-      {media.type === 'video' ? (
-        <video src={media.url} controls autoPlay loop className="w-full rounded-xl" />
-      ) : media.type === 'audio' ? (
+      {mediaType === 'video' ? (
+        <video src={output} controls autoPlay loop className="w-full rounded-xl" />
+      ) : mediaType === 'audio' ? (
         <div className="flex items-center justify-center p-12">
-          <audio src={media.url} controls className="w-full" />
+          <audio src={output} controls className="w-full" />
         </div>
       ) : (
-        <img src={media.url} alt="Generated" className="w-full rounded-xl" />
+        <img src={output} alt="Generated" className="w-full rounded-xl" />
       )}
       <button
         type="button"
-        onClick={() => handleDownload(media.url, media.type)}
+        onClick={() => handleDownload(output, mediaType)}
         className="absolute right-3 top-3 rounded-lg bg-black/60 p-2 text-white backdrop-blur-sm transition-colors hover:bg-purple-600"
       >
         <Download className="h-4 w-4" />

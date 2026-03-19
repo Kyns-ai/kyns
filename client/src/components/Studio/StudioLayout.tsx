@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ImageIcon, Film, Mic, Wrench } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Film, Mic, Wrench, Clapperboard, UserCircle } from 'lucide-react';
 import ImageStudio from './ImageStudio';
 import VideoStudio from './VideoStudio';
+import AnimateStudio from './AnimateStudio';
 import LipSyncStudio from './LipSyncStudio';
+import InfluencerStudio from './InfluencerStudio';
 import ToolsStudio from './ToolsStudio';
 
-type Tab = 'image' | 'video' | 'lipsync' | 'tools';
+type Tab = 'image' | 'video' | 'animate' | 'lipsync' | 'influencer' | 'tools';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'image', label: 'Image', icon: <ImageIcon className="h-4 w-4" /> },
   { id: 'video', label: 'Video', icon: <Film className="h-4 w-4" /> },
+  { id: 'animate', label: 'Animate', icon: <Clapperboard className="h-4 w-4" /> },
   { id: 'lipsync', label: 'Lip Sync', icon: <Mic className="h-4 w-4" /> },
+  { id: 'influencer', label: 'Influencer', icon: <UserCircle className="h-4 w-4" /> },
   { id: 'tools', label: 'Tools', icon: <Wrench className="h-4 w-4" /> },
 ];
 
@@ -76,7 +80,9 @@ export default function StudioLayout() {
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'image' && <ImageStudio />}
         {activeTab === 'video' && <VideoStudio />}
+        {activeTab === 'animate' && <AnimateStudio />}
         {activeTab === 'lipsync' && <LipSyncStudio />}
+        {activeTab === 'influencer' && <InfluencerStudio />}
         {activeTab === 'tools' && <ToolsStudio />}
       </div>
     </div>

@@ -17,7 +17,7 @@ export default function LipSyncStudio() {
   const [audioUrl, setAudioUrl] = useState('');
   const [params, setParams] = useState<Record<string, string | number | boolean>>({});
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
-  const [output, setOutput] = useState<Record<string, string> | undefined>();
+  const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
@@ -41,7 +41,7 @@ export default function LipSyncStudio() {
 
     setStatus('processing');
     setError('');
-    setOutput(undefined);
+    setOutput(null);
     try {
       const allParams: Record<string, string | number | boolean> = { ...params };
       if (model.audioField) {

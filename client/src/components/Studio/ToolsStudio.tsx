@@ -34,7 +34,7 @@ export default function ToolsStudio() {
   const [uploads, setUploads] = useState<Record<string, string>>({});
   const [params, setParams] = useState<Record<string, string | number | boolean>>({});
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
-  const [output, setOutput] = useState<Record<string, string> | undefined>();
+  const [output, setOutput] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const handleParamChange = useCallback((key: string, value: string | number | boolean) => {
@@ -51,7 +51,7 @@ export default function ToolsStudio() {
     }
     setStatus('processing');
     setError('');
-    setOutput(undefined);
+    setOutput(null);
     try {
       const allParams: Record<string, string | number | boolean> = { ...params };
       for (const [field, url] of Object.entries(uploads)) {
@@ -73,7 +73,7 @@ export default function ToolsStudio() {
     setUploads({});
     setParams({});
     setStatus('idle');
-    setOutput(undefined);
+    setOutput(null);
     setError('');
   }, []);
 

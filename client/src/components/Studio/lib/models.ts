@@ -396,6 +396,25 @@ export const i2iModels: StudioModel[] = [
       image_url: { type: 'text', label: 'Image URL' },
     },
   },
+  {
+    id: 'flux-pulid',
+    name: 'Flux PuLID (Face Consistent)',
+    endpoint: 'flux-pulid',
+    category: 'i2i',
+    description: 'Mantém identidade facial da referência em novas imagens',
+    requiresImage: true,
+    imageField: 'image_url',
+    inputs: {
+      prompt: { type: 'textarea', label: 'Prompt' },
+      image_url: { type: 'text', label: 'Reference Image URL' },
+      aspect_ratio: {
+        type: 'select',
+        label: 'Aspect Ratio',
+        default: '1:1',
+        enum: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+      },
+    },
+  },
 ];
 
 /* -------------------------------------------------------------------------- */

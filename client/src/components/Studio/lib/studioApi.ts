@@ -17,7 +17,7 @@ export async function submitJob(
 
 export async function pollResult(
   requestId: string,
-): Promise<{ status: string; output?: Record<string, string> }> {
+): Promise<{ status: string; output?: string | null; error?: string | null }> {
   const resp = await axios.get(`/api/studio/status/${requestId}`, { timeout: 20000 });
   return resp.data;
 }
@@ -36,7 +36,7 @@ export async function generateAndPoll(
   endpoint: string,
   params: Record<string, string | number | boolean>,
   onStatusChange?: (status: string) => void,
-): Promise<Record<string, string>> {
+): Promise<string> {
   const requestId = await submitJob(endpoint, params);
   onStatusChange?.('processing');
   const start = Date.now();
@@ -48,7 +48,7 @@ export async function generateAndPoll(
       return result.output;
     }
     if (result.status === 'failed') {
-      throw new Error(result.output?.error ?? 'Generation failed');
+      throw new Error(result.error ?? 'Generation failed');
     }
   }
   throw new Error('Timeout: generation took more than 10 minutes');

@@ -70,10 +70,12 @@ router.get('/status/:requestId', requireJwtAuth, async (req, res) => {
     });
 
     const { data } = response;
+    const outputUrl = Array.isArray(data.outputs) && data.outputs.length > 0 ? data.outputs[0] : null;
 
     return res.json({
       status: data.status,
-      output: data.output,
+      output: outputUrl,
+      error: data.error || null,
     });
   } catch (error) {
     logger.error('[studio] Status check error', { message: error.message });
