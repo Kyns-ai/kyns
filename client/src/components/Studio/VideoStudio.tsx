@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Wand2 } from 'lucide-react';
-import { t2iModels, i2iModels } from './lib/models';
+import { t2vModels, i2vModels } from './lib/models';
 import { generateAndPoll } from './lib/studioApi';
 import ModelPicker from './components/ModelPicker';
 import ParamControls from './components/ParamControls';
@@ -10,9 +10,9 @@ import GenerationHistory from './components/GenerationHistory';
 import type { HistoryEntry } from './components/GenerationHistory';
 import type { StudioModel } from './lib/models';
 
-export default function ImageStudio() {
-  const [mode, setMode] = useState<'t2i' | 'i2i'>('t2i');
-  const [model, setModel] = useState<StudioModel>(t2iModels[0]);
+export default function VideoStudio() {
+  const [mode, setMode] = useState<'t2v' | 'i2v'>('t2v');
+  const [model, setModel] = useState<StudioModel>(t2vModels[0]);
   const [prompt, setPrompt] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [params, setParams] = useState<Record<string, string | number | boolean>>({});
@@ -21,25 +21,22 @@ export default function ImageStudio() {
   const [error, setError] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  const currentModels = useMemo(() => (mode === 'i2i' ? i2iModels : t2iModels), [mode]);
+  const currentModels = useMemo(() => (mode === 'i2v' ? i2vModels : t2vModels), [mode]);
 
-  const handleModeChange = useCallback(
-    (newMode: 't2i' | 'i2i') => {
-      setMode(newMode);
-      const models = newMode === 'i2i' ? i2iModels : t2iModels;
-      setModel(models[0]);
-      setParams({});
-    },
-    [],
-  );
+  const handleModeChange = useCallback((newMode: 't2v' | 'i2v') => {
+    setMode(newMode);
+    const models = newMode === 'i2v' ? i2vModels : t2vModels;
+    setModel(models[0]);
+    setParams({});
+  }, []);
 
   const handleImageChange = useCallback(
     (url: string) => {
       setImageUrl(url);
-      if (url && mode === 't2i') {
-        handleModeChange('i2i');
-      } else if (!url && mode === 'i2i') {
-        handleModeChange('t2i');
+      if (url && mode === 't2v') {
+        handleModeChange('i2v');
+      } else if (!url && mode === 'i2v') {
+        handleModeChange('t2v');
       }
     },
     [mode, handleModeChange],
@@ -106,21 +103,21 @@ export default function ImageStudio() {
         <div className="flex rounded-lg border border-white/10 bg-white/5 p-1">
           <button
             type="button"
-            onClick={() => handleModeChange('t2i')}
+            onClick={() => handleModeChange('t2v')}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              mode === 't2i' ? 'bg-purple-500/20 text-purple-300' : 'text-gray-400 hover:text-white'
+              mode === 't2v' ? 'bg-purple-500/20 text-purple-300' : 'text-gray-400 hover:text-white'
             }`}
           >
-            Text to Image
+            Text to Video
           </button>
           <button
             type="button"
-            onClick={() => handleModeChange('i2i')}
+            onClick={() => handleModeChange('i2v')}
             className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              mode === 'i2i' ? 'bg-purple-500/20 text-purple-300' : 'text-gray-400 hover:text-white'
+              mode === 'i2v' ? 'bg-purple-500/20 text-purple-300' : 'text-gray-400 hover:text-white'
             }`}
           >
-            Image to Image
+            Image to Video
           </button>
         </div>
 
@@ -134,26 +131,37 @@ export default function ImageStudio() {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe the image you want to create..."
+            placeholder="Describe the video you want to create..."
             rows={4}
             className="resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-purple-500"
           />
         </div>
 
-        {/* Image Upload (for I2I or optional reference) */}
-        <UploadPicker
-          accept="image"
-          value={imageUrl}
-          onChange={handleImageChange}
-          label="Reference Image"
-        />
+        {/* Image Upload for I2V */}
+        {mode === 'i2v' && (
+          <UploadPicker
+            accept="image"
+            value={imageUrl}
+            onChange={handleImageChange}
+            label="Source Image"
+          />
+        )}
+
+        {mode === 't2v' && (
+          <UploadPicker
+            accept="image"
+            value={imageUrl}
+            onChange={handleImageChange}
+            label="Reference Image (optional, switches to I2V)"
+          />
+        )}
 
         {/* Dynamic Params */}
         <ParamControls
           inputs={model.inputs}
           values={params}
           onChange={handleParamChange}
-          hiddenFields={['prompt', model.imageField ?? '']}
+          hiddenFields={['prompt', model.imageField ?? '', 'image_url']}
         />
 
         {/* Generate Button */}
@@ -164,7 +172,7 @@ export default function ImageStudio() {
           className="flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Wand2 className="h-4 w-4" />
-          {status === 'processing' ? 'Generating...' : 'Generate'}
+          {status === 'processing' ? 'Generating...' : 'Generate Video'}
         </button>
       </div>
 
