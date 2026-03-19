@@ -302,6 +302,12 @@ process.on('uncaughtException', (err) => {
     return;
   }
 
+  const networkErrors = ['ECONNRESET', 'EPIPE', 'ECONNABORTED', 'ETIMEDOUT', 'ERR_STREAM_WRITE_AFTER_END'];
+  if (err.code && networkErrors.includes(err.code) || networkErrors.some((e) => err.message.includes(e))) {
+    logger.warn(`Network error (non-fatal): ${err.code || err.message}`);
+    return;
+  }
+
   if (err.message.includes('OpenAIError') || err.message.includes('ChatCompletionMessage')) {
     logger.error(
       '\n\nAn Uncaught `OpenAIError` error may be due to your reverse-proxy setup or stream configuration, or a bug in the `openai` node package.',
