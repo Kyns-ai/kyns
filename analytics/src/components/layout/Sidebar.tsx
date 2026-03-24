@@ -48,6 +48,12 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: 'GPU Agentes',
+    items: [
+      { href: '/dashboard/gpu', label: 'Controle do Pod', icon: 'M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18' },
+    ],
+  },
+  {
     label: 'Sistema',
     items: [
       { href: '/dashboard/infrastructure', label: 'Infraestrutura', icon: 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01' },
