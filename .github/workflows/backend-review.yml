@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Use Node.js 20.19
         uses: actions/setup-node@v4
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Use Node.js 20.19
         uses: actions/setup-node@v4
@@ -172,7 +172,7 @@ jobs:
       BAN_DURATION: ${{ secrets.BAN_DURATION }}
       BAN_INTERVAL: ${{ secrets.BAN_INTERVAL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Use Node.js 20.19
         uses: actions/setup-node@v4
@@ -230,7 +230,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Use Node.js 20.19
         uses: actions/setup-node@v4
@@ -268,7 +268,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Use Node.js 20.19
         uses: actions/setup-node@v4
@@ -312,7 +312,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Use Node.js 20.19
         uses: actions/setup-node@v4

@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout worker-vllm
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: runpod-workers/worker-vllm
           ref: v2.14.0
