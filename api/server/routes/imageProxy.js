@@ -246,6 +246,7 @@ const imageGenerationLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipFailedRequests: true,
+  validate: { ipv6SubnetOrKeyGenerator: false, keyGeneratorIpFallback: false },
   keyGenerator: (req) => String(getRequesterUserId(req) ?? req.ip),
   requestWasSuccessful: (_req, res) => res.locals.imageGenerationCountable === true,
   store: limiterCache('image_generation_user_limiter'),
