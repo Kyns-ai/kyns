@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-ARG CACHEBUST=2
+ARG CACHEBUST=1774391246
 RUN echo "cache-bust: $CACHEBUST"
 COPY . .
 RUN npm run build
