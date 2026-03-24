@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAuthenticated } from '@/lib/auth'
 
 const RUNPOD_GQL = 'https://api.runpod.io/graphql'
-const POD_NAME = process.env.AGENT_POD_NAME ?? 'kyns-agent-gpu'
+const POD_NAME = process.env.AGENT_POD_NAME ?? 'kyns-agent-test'
 
 interface RunpodPort {
   privatePort: number
@@ -130,8 +130,8 @@ export async function POST(req: NextRequest) {
     if (action === 'start') {
       const gpuTypeId  = process.env.AGENT_GPU_TYPE_ID ?? 'NVIDIA H100 NVL'
       const llmKey     = process.env.AGENT_LLM_KEY ?? 'kyns-agent-key'
-      const hfRepo     = process.env.AGENT_HF_REPO ?? 'llmfan46/Qwen3.5-35B-A3B-heretic-v2-GGUF'
-      const hfFile     = process.env.AGENT_HF_FILE ?? 'Qwen3.5-35B-A3B-heretic-v2-Q4_K_M.gguf'
+      const hfRepo     = process.env.AGENT_HF_REPO ?? 'unsloth/Qwen3.5-35B-A3B-GGUF'
+      const hfFile     = process.env.AGENT_HF_FILE ?? 'Qwen3.5-35B-A3B-UD-Q4_K_XL.gguf'
       const volumeId   = process.env.AGENT_VOLUME_ID
 
       const dockerArgs = [
@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
         '--cont-batching',
         '--cache-type-k q8_0',
         '--cache-type-v q8_0',
+        '--jinja',
         `--api-key ${llmKey}`,
       ].join(' ')
 

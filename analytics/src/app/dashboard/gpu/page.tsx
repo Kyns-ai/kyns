@@ -346,9 +346,9 @@ export default function GpuPage() {
               ['AGENT_LLM_KEY', 'API key do servidor llama.cpp', 'ex: kyns-agent-2026'],
               ['AGENT_VOLUME_ID', 'ID do network volume (RunPod)', 'ex: abc123de'],
               ['AGENT_GPU_TYPE_ID', 'GPU a usar (padrão: H100 NVL)', 'NVIDIA H100 NVL'],
-              ['AGENT_POD_NAME', 'Nome do pod (padrão: kyns-agent-gpu)', 'kyns-agent-gpu'],
-              ['AGENT_HF_REPO', 'Repo HuggingFace do modelo', 'llmfan46/Qwen3.5-35B-A3B-heretic-v2-GGUF'],
-              ['AGENT_HF_FILE', 'Arquivo GGUF do modelo', 'Qwen3.5-35B-A3B-heretic-v2-Q4_K_M.gguf'],
+              ['AGENT_POD_NAME', 'Nome do pod (padrão: kyns-agent-test)', 'kyns-agent-test'],
+              ['AGENT_HF_REPO', 'Repo HuggingFace do modelo', 'unsloth/Qwen3.5-35B-A3B-GGUF'],
+              ['AGENT_HF_FILE', 'Arquivo GGUF do modelo', 'Qwen3.5-35B-A3B-UD-Q4_K_XL.gguf'],
             ].map(([varName, desc, example]) => (
               <div key={varName} className="flex items-center gap-3 p-2 bg-white/3 rounded">
                 <code className="text-accent shrink-0 w-40">{varName}</code>
