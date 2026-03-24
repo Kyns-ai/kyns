@@ -2,10 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-ARG CACHEBUST=1
 COPY package*.json ./
 RUN npm install
 
+ARG CACHEBUST=1
+RUN echo "cache-bust: $CACHEBUST"
 COPY . .
 RUN npm run build
 

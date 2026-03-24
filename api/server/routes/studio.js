@@ -111,4 +111,23 @@ router.post('/upload', requireJwtAuth, upload.single('file'), async (req, res) =
   }
 });
 
+router.post('/warmup', requireJwtAuth, async (_req, res) => {
+  try {
+    await axios.post(
+      `${MUAPI_BASE}/flux-schnell`,
+      { prompt: 'warmup', num_outputs: 1 },
+      {
+        headers: {
+          'x-api-key': process.env.MUAPI_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        timeout: 5000,
+      },
+    );
+  } catch {
+    // Ignore - the goal is just to wake the GPU, not get a result
+  }
+  return res.json({ status: 'warming' });
+});
+
 module.exports = router;

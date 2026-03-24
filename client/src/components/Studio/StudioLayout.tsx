@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { ArrowLeft, ImageIcon, Film, Mic, Wrench, Clapperboard, UserCircle } from 'lucide-react';
 import ImageStudio from './ImageStudio';
 import VideoStudio from './VideoStudio';
@@ -22,6 +23,10 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 export default function StudioLayout() {
   const [activeTab, setActiveTab] = useState<Tab>('image');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    axios.post('/api/studio/warmup').catch(() => {});
+  }, []);
 
   return (
     <div className="flex h-full flex-col bg-gray-900">
