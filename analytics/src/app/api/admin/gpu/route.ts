@@ -104,7 +104,8 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error('[gpu/GET]', e)
+    return NextResponse.json({ error: 'Erro interno ao consultar pod' }, { status: 500 })
   }
 }
 
@@ -220,6 +221,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Ação desconhecida' }, { status: 400 })
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    console.error('[gpu/POST]', e)
+    return NextResponse.json({ error: 'Erro interno ao executar ação no pod' }, { status: 500 })
   }
 }

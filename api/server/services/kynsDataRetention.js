@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { Message, Conversation } = require('~/db/models');
+const { Message, Conversation, SharedLink } = require('~/db/models');
 const { logger } = require('~/config');
 const paths = require('~/config/paths');
 
@@ -43,6 +43,11 @@ async function purgeExpiredConversations() {
 async function hardDeleteExpired() {
   const graceCutoff = new Date(Date.now() - HARD_DELETE_GRACE_MS);
 
+  const expiredConvos = await Conversation.find(
+    { expiredAt: { $ne: null, $lt: graceCutoff } },
+    { conversationId: 1 },
+  ).lean();
+
   const msgResult = await Message.deleteMany({
     expiredAt: { $ne: null, $lt: graceCutoff },
   });
@@ -51,10 +56,19 @@ async function hardDeleteExpired() {
     expiredAt: { $ne: null, $lt: graceCutoff },
   });
 
-  const total = (msgResult.deletedCount ?? 0) + (convoResult.deletedCount ?? 0);
+  let sharedDeleted = 0;
+  if (expiredConvos.length > 0) {
+    const expiredConvoIds = expiredConvos.map((c) => c.conversationId);
+    const shareResult = await SharedLink.deleteMany({
+      conversationId: { $in: expiredConvoIds },
+    });
+    sharedDeleted = shareResult.deletedCount ?? 0;
+  }
+
+  const total = (msgResult.deletedCount ?? 0) + (convoResult.deletedCount ?? 0) + sharedDeleted;
   if (total > 0) {
     logger.info(
-      `[kynsDataRetention] Hard-deleted ${msgResult.deletedCount} messages, ${convoResult.deletedCount} conversations`,
+      `[kynsDataRetention] Hard-deleted ${msgResult.deletedCount} messages, ${convoResult.deletedCount} conversations, ${sharedDeleted} shared links`,
     );
   }
 }
