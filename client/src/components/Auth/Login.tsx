@@ -10,8 +10,38 @@ import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
 import LoginForm from './LoginForm';
 
+const KYNS_GITHUB_URL = 'https://github.com/Kyns-ai/kyns';
+
 interface LoginLocationState {
   redirect_to?: string;
+}
+
+function KynsPauseNotice() {
+  const localize = useLocalize();
+
+  return (
+    <section
+      aria-labelledby="kyns-pause-title"
+      className="mb-6 rounded-2xl border border-green-500/25 bg-green-500/10 p-4 text-sm leading-6 text-gray-700 dark:text-gray-200"
+    >
+      <h2 id="kyns-pause-title" className="text-base font-semibold text-gray-950 dark:text-white">
+        {localize('com_auth_kyns_pause_title')}
+      </h2>
+      <p className="mt-2">{localize('com_auth_kyns_pause_message')}</p>
+      <p className="mt-3">
+        {localize('com_auth_kyns_pause_source_prefix')}{' '}
+        <a
+          href={KYNS_GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold text-green-600 underline decoration-transparent transition-all duration-200 hover:text-green-700 hover:decoration-green-700 focus:text-green-700 focus:decoration-green-700 dark:text-green-500 dark:hover:text-green-400 dark:hover:decoration-green-400 dark:focus:text-green-400"
+        >
+          {localize('com_auth_kyns_pause_source_link')}
+        </a>{' '}
+        {localize('com_auth_kyns_pause_source_suffix')}
+      </p>
+    </section>
+  );
 }
 
 function Login() {
@@ -100,6 +130,7 @@ function Login() {
 
   return (
     <>
+      <KynsPauseNotice />
       {error != null && <ErrorMessage>{localize(getLoginError(error))}</ErrorMessage>}
       {startupConfig?.emailLoginEnabled === true && (
         <LoginForm
