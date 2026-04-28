@@ -6,6 +6,14 @@ const BLOCKED_REQUEST_RESPONSE = 'Essa conversa não pode continuar nessa direç
 const BLOCKED_RESPONSE_REPLACEMENT =
   'Não posso gerar esse tipo de conteúdo. Todos os personagens no KYNS são adultos.';
 const BLOCKED_USER_PLACEHOLDER = '[Mensagem bloqueada pela política da plataforma]';
+const KYNS_PROJECT_PAUSED_REASON = 'PROJECT_PAUSED';
+const KYNS_PROJECT_PAUSED_RESPONSE =
+  'Estamos em pausa para voltar com mais cuidado.\n\n' +
+  'O Kyns nasceu para tornar a inteligência artificial mais útil, aberta e acessível. ' +
+  'Pausamos por um momento para cuidar melhor dos nossos princípios: liberdade, transparência e tecnologia a serviço das pessoas. ' +
+  'Logo voltamos com esta iniciativa gratuita.\n\n' +
+  'Enquanto isso, abrimos o nosso código-fonte no GitHub: https://github.com/Kyns-ai/kyns ' +
+  'para que você possa criar o seu próprio chat, adaptar a ideia e seguir construindo com a gente.';
 const LOOP_INTERRUPTED_RESPONSE = 'A resposta entrou em loop e foi interrompida. Tente novamente.';
 const INITIAL_VISIBLE_BUFFER_CHAR_LIMIT = 0;
 const MIN_VISIBLE_TEXT_TO_KEEP_ON_LOOP = 240;
@@ -478,6 +486,8 @@ module.exports = {
   BLOCKED_REQUEST_RESPONSE,
   BLOCKED_RESPONSE_REPLACEMENT,
   BLOCKED_USER_PLACEHOLDER,
+  KYNS_PROJECT_PAUSED_REASON,
+  KYNS_PROJECT_PAUSED_RESPONSE,
   LOOP_INTERRUPTED_RESPONSE,
   SELF_HARM_CVV_RESPONSE,
   KynsResponseFilteredError,

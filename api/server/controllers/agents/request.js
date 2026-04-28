@@ -16,6 +16,8 @@ const { saveMessage, saveConvo } = require('~/models');
 const {
   BLOCKED_REQUEST_RESPONSE,
   BLOCKED_USER_PLACEHOLDER,
+  KYNS_PROJECT_PAUSED_REASON,
+  KYNS_PROJECT_PAUSED_RESPONSE,
   SELF_HARM_CVV_RESPONSE,
 } = require('~/server/services/safety/kynsPlatform');
 const {
@@ -47,6 +49,18 @@ function createCloseHandler(abortController) {
   };
 }
 
+function getBlockedResponseText(reason) {
+  if (reason === 'SELF_HARM_METHOD') {
+    return SELF_HARM_CVV_RESPONSE;
+  }
+
+  if (reason === KYNS_PROJECT_PAUSED_REASON) {
+    return KYNS_PROJECT_PAUSED_RESPONSE;
+  }
+
+  return BLOCKED_REQUEST_RESPONSE;
+}
+
 async function emitBlockedSafetyResponse({
   req,
   res,
@@ -62,6 +76,7 @@ async function emitBlockedSafetyResponse({
   const sender = getResponseSender(req.body);
   const model =
     endpointOption?.model_parameters?.model ?? endpointOption?.modelOptions?.model ?? undefined;
+  const isProjectPaused = reason === KYNS_PROJECT_PAUSED_REASON;
   const userMessage = {
     sender: 'User',
     messageId: userMessageId,
@@ -72,11 +87,11 @@ async function emitBlockedSafetyResponse({
   };
   const storedUserMessage = {
     ...userMessage,
-    text: BLOCKED_USER_PLACEHOLDER,
+    text: isProjectPaused ? text : BLOCKED_USER_PLACEHOLDER,
     endpoint: endpointOption.endpoint,
     user: userId,
   };
-  const responseText = reason === 'SELF_HARM_METHOD' ? SELF_HARM_CVV_RESPONSE : BLOCKED_REQUEST_RESPONSE;
+  const responseText = getBlockedResponseText(reason);
   const responseMessage = {
     sender,
     messageId: responseMessageId,
@@ -95,12 +110,17 @@ async function emitBlockedSafetyResponse({
     iconURL: endpointOption.iconURL,
   };
 
-  logger.warn('[AgentChat] Blocked request by KYNS safety filter', {
-    reason,
-    userId,
-    conversationId,
-    endpoint: endpointOption.endpoint,
-  });
+  logger.warn(
+    isProjectPaused
+      ? '[AgentChat] Answered request with KYNS pause notice'
+      : '[AgentChat] Blocked request by KYNS safety filter',
+    {
+      reason,
+      userId,
+      conversationId,
+      endpoint: endpointOption.endpoint,
+    },
+  );
 
   try {
     await saveMessage(req, storedUserMessage, {
