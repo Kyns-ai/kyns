@@ -19,7 +19,7 @@ jobs:
     steps:
       # Check out the repository
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Set up QEMU
       - name: Set up QEMU
